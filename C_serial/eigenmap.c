@@ -1,99 +1,79 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
+#include <string.h>
 #include <matio.h>
 #include <sys/time.h>
-#include "book.h"
-#include <cuda_runtime.h>
 #include "eigenmap.h"
-#include <string>
 
-using std::string;
+int NUM_EIGS;
+char filename[30];
 
-static int NUM_EIGS;
-
-string filename;
-
-double GetTimerValue(timeval time_1, timeval time_2);
-
+double GetTimerValue(struct timeval time_1, struct timeval time_2);
 void read_mat(const char *filename, double **data_array, double **pos_array, size_t *data_dim, size_t *pos_dim);
 void write_mat(double *F, double *Es, int n_patch);
-
-void write_weight(const double *dev_w, int n_patch);
-void write_laplacian(const double *dev_l, int n_patch,
-                     string varname, string filename);
-
 int main(int argc, char **argv)
 {
 	double *data_array, *pos_array;
 	size_t data_dim[3] = {0};
 	size_t pos_dim[2] = {0};
-	double *w, *dev_w; // weight matrix.
-	double *dev_l;
+	double *w;
+	double *l;
 	double *F, *Es;
 	int n_patch;
 	int scale[2];
 	int par[2];
-	timeval timer1, timer2;
+	struct timeval timer1, timer2;
+
+    int i;
 
 	if (argc != 5) {
-		printf("Usage: ./eigenmap [MAT file containing patches] "
+		printf("Usage: ./eigenmap_c [MAT file containing patches] "
 		       "[# of eigenvalues] [parameter 1] [parameter 2]\n");
 		return 0;
 	}
-
 	if (sscanf(argv[2], "%d", &NUM_EIGS) < 1 || NUM_EIGS < 1 ||
 		sscanf(argv[3], "%d", &par[0]) < 1 || par[0] < 1 ||
 		sscanf(argv[4], "%d", &par[1]) < 1 || par[1] < 1) {
-		printf("Usage: ./eigenmap [MAT file containing patches] "
+		printf("Usage: ./eigenmap_c [MAT file containing patches] "
 		       "[# of eigenvalues] [parameter 1] [parameter 2]\n");
 		return 0;
 	}
-
+    
     // DEBUG
-    filename = argv[1];
-    filename.resize(filename.size() - 4);
+    for (i = 0; argv[1][i] != '.'; i++)
+        filename[i] = argv[1][i];
+    filename[i] = '\0';
 
-	// 1. Read in the matlab file that contains patches structure.
-    read_mat(argv[1], &data_array, &pos_array, data_dim, pos_dim);
+	// Read in the matlab file that contains patches structure.
+	read_mat(argv[1], &data_array, &pos_array, data_dim, pos_dim);
 	n_patch = (int) data_dim[2];
 	scale[0] = (int) data_dim[0];
 	scale[1] = (int) data_dim[1];
-	printf("# eigenvalues: %d\nparameter 1: %d\nparameter 2: %d\n",
-			NUM_EIGS, par[0], par[1]);
 	printf("%lux%lux%lu\n", data_dim[0], data_dim[1], data_dim[2]);
-
-	/* memory allocation */
-	HANDLE_ERROR(cudaMalloc((void **)&dev_w, n_patch * n_patch * sizeof(double)));
-	HANDLE_ERROR(cudaMemset(dev_w, 0, n_patch * n_patch * sizeof(double)));
-	HANDLE_ERROR(cudaMalloc((void **)&dev_l, n_patch * n_patch * sizeof(double)));
+		// memory allocation
 	w = (double *)malloc(n_patch * n_patch * sizeof(double));
+	memset(w, 0, n_patch * n_patch * sizeof(double));
+	l = (double *)malloc(n_patch * n_patch * sizeof(double));
+	memset(l, 0, n_patch * n_patch * sizeof(double));
 	F = (double *)malloc(n_patch * NUM_EIGS * sizeof(double));
 	Es = (double *)malloc(NUM_EIGS * sizeof(double));
 	
-	// 2. Compute the weight matrix W
-	// 3. W = W + W'
-	pairweight(dev_w, n_patch, data_array, pos_array, scale, pos_dim[0], par, 1);
-    write_weight(dev_w, n_patch);
-	
-	// 4. Compute the Laplacian L
-	laplacian(dev_l, dev_w, n_patch);
-    write_laplacian(dev_l, n_patch, "L_gpu_final", filename + "_gpu_laplacian_final.mat");
-
-	// 5. Compute eigenvalues and eigenvectors of L
 	gettimeofday(&timer1, NULL);
-	eigs(F, Es, dev_l, NUM_EIGS, n_patch);
+	// Compute the weight matrix W. And W = W + W'
+	pairweight(w, n_patch, data_array, pos_array, scale, pos_dim[0], par, 1);
+	// Compute the Laplacian L
+	laplacian(l, w, n_patch);	
+	// Compute eigenvalues and eigen vectors of L
+	eigs(F, Es, l, NUM_EIGS, n_patch);
 	gettimeofday(&timer2, NULL);
 	printf("Time to compute: %.3lf ms\n", GetTimerValue(timer1, timer2));
 
-	// 6. output the result to L.mat
+	// output the result
 	write_mat(F, Es, n_patch);
 
-	HANDLE_ERROR(cudaFree(dev_w));
-	HANDLE_ERROR(cudaFree(dev_l));
-	free(data_array);
-	free(pos_array);
+	// free memory
 	free(w);
+	free(l);
 	free(F);
 	free(Es);
 }
@@ -146,7 +126,31 @@ void read_mat(const char *filename, double **data_array, double **pos_array, siz
 	Mat_VarFree(patches);
 	Mat_Close(matfp);
 }
+void write_l(double *l, int n_patch)
+{
+    mat_t *matfp;
+    matvar_t *lm;
+	size_t l_dims[2] = {n_patch, n_patch};
 
+	matfp = Mat_CreateVer("l.mat", NULL, MAT_FT_DEFAULT);
+	if(matfp == NULL) {
+		fprintf(stderr, "Error creating MAT file \"w.mat\"\n");
+		exit(EXIT_FAILURE);
+	}
+
+	lm = Mat_VarCreate("l", MAT_C_DOUBLE, MAT_T_DOUBLE, 2, l_dims, l, 0);
+	if(lm == NULL) {
+		fprintf(stderr, "Error creating MAT variable l.\n");
+		Mat_Close(matfp);
+		exit(EXIT_FAILURE);
+	} else {
+		Mat_VarWrite(matfp, lm, MAT_COMPRESSION_NONE);
+		Mat_VarFree(lm);
+	}
+	
+	Mat_Close(matfp);
+
+}
 void write_mat(double *F, double *Es, int n_patch)
 {
     mat_t *matfp;
@@ -193,47 +197,10 @@ void write_mat(double *F, double *Es, int n_patch)
 	Mat_Close(matfp);
 }
 
-double GetTimerValue(timeval time_1, timeval time_2)
+double GetTimerValue(struct timeval time_1, struct timeval time_2)
 {
   int sec, usec;
   sec  = time_2.tv_sec  - time_1.tv_sec;
   usec = time_2.tv_usec - time_1.tv_usec;
   return (1000.*(double)(sec) + (double)(usec) * 0.001);
-}
-
-
-void write_weight(const double *dev_w, int n_patch)
-{
-    mat_t *matfp;
-    matvar_t *W;
-    double *host_w = (double *)malloc(n_patch * n_patch * sizeof(double));
-	size_t W_dims[2] = {n_patch, n_patch};
-
-	matfp = Mat_CreateVer("nCPM4_weight_gpu.mat", NULL, MAT_FT_DEFAULT);
-
-    cudaMemcpy(host_w, dev_w, n_patch * n_patch * sizeof(double), cudaMemcpyDeviceToHost);
-	W = Mat_VarCreate("W_gpu", MAT_C_DOUBLE, MAT_T_DOUBLE, 2, W_dims, host_w, 0);
-    Mat_VarWrite(matfp, W, MAT_COMPRESSION_NONE);
-    
-	Mat_Close(matfp);
-    Mat_VarFree(W);
-    free(host_w);
-}
-void write_laplacian(const double *dev_l, int n_patch,
-                     string varname, string filename)
-{
-    mat_t *matfp;
-    matvar_t *L;
-    double *host_l = (double *)malloc(n_patch * n_patch * sizeof(double));
-	size_t L_dims[2] = {n_patch, n_patch};
-
-	matfp = Mat_CreateVer(filename.c_str(), NULL, MAT_FT_DEFAULT);
-
-    cudaMemcpy(host_l, dev_l, n_patch * n_patch * sizeof(double), cudaMemcpyDeviceToHost);
-	L = Mat_VarCreate(varname.c_str(), MAT_C_DOUBLE, MAT_T_DOUBLE, 2, L_dims, host_l, 0);
-    Mat_VarWrite(matfp, L, MAT_COMPRESSION_NONE);
-    
-	Mat_Close(matfp);
-    Mat_VarFree(L);
-    free(host_l);
 }

@@ -1,3 +1,9 @@
 eigenmap
+eigenmap_c
 *.o
 *.mat
+Test_Data/
+results/
+screenlog.*
+midreport_04082013/
+notify.py
