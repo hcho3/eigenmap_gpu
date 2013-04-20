@@ -1,7 +1,0 @@
-all: eigen_c
-
-eigen_c: eigen_c.c pairweight_c.c laplacian_c.c eigs_c.c
-	gcc -o eigen_c pairweight_c.c laplacian_c.c eigs_c.c eigen_c.c $(HOME)/lib/libmatio.a -lm -lz -llapack -llapacke -lblas -lcblas -I$(HOME)/include
-
-clean:
-	rm eigen_c
