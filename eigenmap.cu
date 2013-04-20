@@ -6,22 +6,13 @@
 #include "book.h"
 #include <cuda_runtime.h>
 #include "eigenmap.h"
-#include <string>
-
-using std::string;
 
 static int NUM_EIGS;
-
-string filename;
 
 double GetTimerValue(timeval time_1, timeval time_2);
 
 void read_mat(const char *filename, double **data_array, double **pos_array, size_t *data_dim, size_t *pos_dim);
 void write_mat(double *F, double *Es, int n_patch);
-
-void write_weight(const double *dev_w, int n_patch);
-void write_laplacian(const double *dev_l, int n_patch,
-                     string varname, string filename);
 
 int main(int argc, char **argv)
 {
@@ -50,10 +41,6 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-    // DEBUG
-    filename = argv[1];
-    filename.resize(filename.size() - 4);
-
 	// 1. Read in the matlab file that contains patches structure.
     read_mat(argv[1], &data_array, &pos_array, data_dim, pos_dim);
 	n_patch = (int) data_dim[2];
@@ -73,15 +60,13 @@ int main(int argc, char **argv)
 	
 	// 2. Compute the weight matrix W
 	// 3. W = W + W'
+	gettimeofday(&timer1, NULL);
 	pairweight(dev_w, n_patch, data_array, pos_array, scale, pos_dim[0], par, 1);
-    write_weight(dev_w, n_patch);
 	
 	// 4. Compute the Laplacian L
 	laplacian(dev_l, dev_w, n_patch);
-    write_laplacian(dev_l, n_patch, "L_gpu_final", filename + "_gpu_laplacian_final.mat");
 
 	// 5. Compute eigenvalues and eigenvectors of L
-	gettimeofday(&timer1, NULL);
 	eigs(F, Es, dev_l, NUM_EIGS, n_patch);
 	gettimeofday(&timer2, NULL);
 	printf("Time to compute: %.3lf ms\n", GetTimerValue(timer1, timer2));
@@ -199,41 +184,4 @@ double GetTimerValue(timeval time_1, timeval time_2)
   sec  = time_2.tv_sec  - time_1.tv_sec;
   usec = time_2.tv_usec - time_1.tv_usec;
   return (1000.*(double)(sec) + (double)(usec) * 0.001);
-}
-
-
-void write_weight(const double *dev_w, int n_patch)
-{
-    mat_t *matfp;
-    matvar_t *W;
-    double *host_w = (double *)malloc(n_patch * n_patch * sizeof(double));
-	size_t W_dims[2] = {n_patch, n_patch};
-
-	matfp = Mat_CreateVer("nCPM4_weight_gpu.mat", NULL, MAT_FT_DEFAULT);
-
-    cudaMemcpy(host_w, dev_w, n_patch * n_patch * sizeof(double), cudaMemcpyDeviceToHost);
-	W = Mat_VarCreate("W_gpu", MAT_C_DOUBLE, MAT_T_DOUBLE, 2, W_dims, host_w, 0);
-    Mat_VarWrite(matfp, W, MAT_COMPRESSION_NONE);
-    
-	Mat_Close(matfp);
-    Mat_VarFree(W);
-    free(host_w);
-}
-void write_laplacian(const double *dev_l, int n_patch,
-                     string varname, string filename)
-{
-    mat_t *matfp;
-    matvar_t *L;
-    double *host_l = (double *)malloc(n_patch * n_patch * sizeof(double));
-	size_t L_dims[2] = {n_patch, n_patch};
-
-	matfp = Mat_CreateVer(filename.c_str(), NULL, MAT_FT_DEFAULT);
-
-    cudaMemcpy(host_l, dev_l, n_patch * n_patch * sizeof(double), cudaMemcpyDeviceToHost);
-	L = Mat_VarCreate(varname.c_str(), MAT_C_DOUBLE, MAT_T_DOUBLE, 2, L_dims, host_l, 0);
-    Mat_VarWrite(matfp, L, MAT_COMPRESSION_NONE);
-    
-	Mat_Close(matfp);
-    Mat_VarFree(L);
-    free(host_l);
 }

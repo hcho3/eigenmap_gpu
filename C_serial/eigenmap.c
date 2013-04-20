@@ -6,7 +6,6 @@
 #include "eigenmap.h"
 
 int NUM_EIGS;
-char filename[30];
 
 double GetTimerValue(struct timeval time_1, struct timeval time_2);
 void read_mat(const char *filename, double **data_array, double **pos_array, size_t *data_dim, size_t *pos_dim);
@@ -39,11 +38,6 @@ int main(int argc, char **argv)
 		return 0;
 	}
     
-    // DEBUG
-    for (i = 0; argv[1][i] != '.'; i++)
-        filename[i] = argv[1][i];
-    filename[i] = '\0';
-
 	// Read in the matlab file that contains patches structure.
 	read_mat(argv[1], &data_array, &pos_array, data_dim, pos_dim);
 	n_patch = (int) data_dim[2];
@@ -125,31 +119,6 @@ void read_mat(const char *filename, double **data_array, double **pos_array, siz
 
 	Mat_VarFree(patches);
 	Mat_Close(matfp);
-}
-void write_l(double *l, int n_patch)
-{
-    mat_t *matfp;
-    matvar_t *lm;
-	size_t l_dims[2] = {n_patch, n_patch};
-
-	matfp = Mat_CreateVer("l.mat", NULL, MAT_FT_DEFAULT);
-	if(matfp == NULL) {
-		fprintf(stderr, "Error creating MAT file \"w.mat\"\n");
-		exit(EXIT_FAILURE);
-	}
-
-	lm = Mat_VarCreate("l", MAT_C_DOUBLE, MAT_T_DOUBLE, 2, l_dims, l, 0);
-	if(lm == NULL) {
-		fprintf(stderr, "Error creating MAT variable l.\n");
-		Mat_Close(matfp);
-		exit(EXIT_FAILURE);
-	} else {
-		Mat_VarWrite(matfp, lm, MAT_COMPRESSION_NONE);
-		Mat_VarFree(lm);
-	}
-	
-	Mat_Close(matfp);
-
 }
 void write_mat(double *F, double *Es, int n_patch)
 {
