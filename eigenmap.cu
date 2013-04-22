@@ -6,6 +6,7 @@
 #include "book.h"
 #include <cuda_runtime.h>
 #include "eigenmap.h"
+#include <nvToolsExt.h>
 
 static int NUM_EIGS;
 
@@ -20,7 +21,6 @@ int main(int argc, char **argv)
 	size_t data_dim[3] = {0};
 	size_t pos_dim[2] = {0};
 	double *w, *dev_w; // weight matrix.
-	double *dev_l;
 	double *F, *Es;
 	int n_patch;
 	int scale[2];
@@ -53,21 +53,26 @@ int main(int argc, char **argv)
 	/* memory allocation */
 	HANDLE_ERROR(cudaMalloc((void **)&dev_w, n_patch * n_patch * sizeof(double)));
 	HANDLE_ERROR(cudaMemset(dev_w, 0, n_patch * n_patch * sizeof(double)));
-	HANDLE_ERROR(cudaMalloc((void **)&dev_l, n_patch * n_patch * sizeof(double)));
 	w = (double *)malloc(n_patch * n_patch * sizeof(double));
 	F = (double *)malloc(n_patch * NUM_EIGS * sizeof(double));
 	Es = (double *)malloc(NUM_EIGS * sizeof(double));
-	
+
 	// 2. Compute the weight matrix W
 	// 3. W = W + W'
+    nvtxRangeId_t id1 = nvtxRangeStartA("pairweight");
 	gettimeofday(&timer1, NULL);
 	pairweight(dev_w, n_patch, data_array, pos_array, scale, pos_dim[0], par, 1);
+	nvtxRangeEnd(id1);
 	
 	// 4. Compute the Laplacian L
-	laplacian(dev_l, dev_w, n_patch);
+	nvtxRangeId_t id2 = nvtxRangeStartA("laplacian");
+	laplacian(dev_w, n_patch);
+	nvtxRangeEnd(id2);
 
 	// 5. Compute eigenvalues and eigenvectors of L
-	eigs(F, Es, dev_l, NUM_EIGS, n_patch);
+	nvtxRangeId_t id3 = nvtxRangeStartA("eigs");
+	eigs(F, Es, dev_w, NUM_EIGS, n_patch);
+	nvtxRangeEnd(id3);
 	gettimeofday(&timer2, NULL);
 	printf("Time to compute: %.3lf ms\n", GetTimerValue(timer1, timer2));
 
@@ -75,7 +80,6 @@ int main(int argc, char **argv)
 	write_mat(F, Es, n_patch);
 
 	HANDLE_ERROR(cudaFree(dev_w));
-	HANDLE_ERROR(cudaFree(dev_l));
 	free(data_array);
 	free(pos_array);
 	free(w);

@@ -6,5 +6,8 @@ Test_Data/
 results/
 screenlog.*
 midreport_04082013/
-notify.py
 test.m
+notify.py
+.project
+.cproject
+.metadata/

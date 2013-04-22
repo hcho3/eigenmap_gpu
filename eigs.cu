@@ -34,7 +34,6 @@ void eigs(double *F, double *Es, double *dev_l, int n_eigs, int n_patch)
 	magma_int_t *iwork;
 	double *work, *wa;
 	double *lambda; /* eigenvalues */ 
-    double *l;
     magma_int_t ret;
 
 	/* initialize constants */
@@ -53,15 +52,6 @@ void eigs(double *F, double *Es, double *dev_l, int n_eigs, int n_patch)
     ret = magma_dsyevd_gpu('V', 'L', n_patch, dev_l, n_patch, lambda, wa, ldwa, work, lwork, iwork, liwork, &info);
     printf("ret = %d, info = %d\n", ret, info);
     assert(MAGMA_SUCCESS == ret);
-    //l = (double *)malloc(n_patch * n_patch * sizeof(double));
-    //cudaMemcpy(l, dev_l, n_patch * n_patch * sizeof(double), cudaMemcpyDeviceToHost);
-    //magma_int_t m;
-    //assert(MAGMA_SUCCESS == magma_dsyevdx('V', 'I', 'L', n_patch, l, n_patch, 0, 0, 1, n_eigs, &m, lambda, work, lwork, iwork, liwork, &info));
-    //printf("# of computed eigenvalues = %d\n", m);
-    //assert(m == n_eigs);
-    for (int i = 0; i < n_eigs; i++)
-        printf("%.4lf ", lambda[i]);
-    printf("\n");
 
 	/* Copy specified number of eigenvalues */
 	memcpy(Es, lambda, n_eigs * sizeof(double));

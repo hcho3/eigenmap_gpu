@@ -9,19 +9,17 @@
 #include <matio.h>
 
 __global__ void diag(double *dev_d, const double *dev_w, int n_patch);
-__global__ void eye(double *dev_l, int n_patch);
-__global__ void compute_l(double *dev_l, double *dev_w, int n_patch);
+__global__ void compute_l(double *dev_w, int n_patch);
 __device__ double atomicAdd(double* address, double val);
 void diag_similarity_transform(cublasHandle_t handle, double *dev_w, int n_patch);
 
 /*
  * laplacian computes the Laplacian matrix based on the weight matrix.
- * dev_l: the laplacian matrix
  * dev_w: the weight matrix
  * n_patch: the dimension of dev_w and dev_l
- * Note: dev_l and dev_w are overwritten and stay (not freed) in the memory.
+ * Note: the Laplacian matrix is computed in-place and overwrites dev_w.
  */
-void laplacian(double *dev_l, double *dev_w, int n_patch)
+void laplacian(double *dev_w, int n_patch)
 {
 	/* ---- corresponding Matlab code ----
 	 * D = diag(sum(W));
@@ -30,14 +28,11 @@ void laplacian(double *dev_l, double *dev_w, int n_patch)
 	cublasHandle_t handle;
 	
 	cublasCreate(&handle);
-	HANDLE_ERROR(cudaMemset(dev_l, 0, n_patch * n_patch * sizeof(double)));
-
-	eye<<<BPG, 1>>>(dev_l, n_patch); // L <- eye(n_patch)
 
     // W <- D * W * D
     diag_similarity_transform(handle, dev_w, n_patch);
-    // L <- L - W
-    compute_l<<<BPG, TPB>>>(dev_l, dev_w, n_patch);
+    // L <- I - W
+    compute_l<<<BPG, TPB>>>(dev_w, n_patch);
     cudaDeviceSynchronize();
 	
 	cublasDestroy(handle);
@@ -94,20 +89,12 @@ __global__ void diag(double *dev_d, const double *dev_w, int n_patch)
 		b += BPG;
 	}
 }
-__global__ void eye(double *dev_l, int n_patch)
-{
-	int i = blockIdx.x;
-	while(i < n_patch) {
-		dev_l[i + i * n_patch] = 1.0;
-		i += BPG;
-	}
-}
-__global__ void compute_l(double *dev_l, double *dev_w, int n_patch)
+__global__ void compute_l(double *dev_w, int n_patch)
 {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
     int N = n_patch * n_patch;
     while (tid < N) {
-        dev_l[tid] -= dev_w[tid];
+        dev_w[tid] = ((tid % (n_patch + 1) == 0) ? 1.0 : 0.0) - dev_w[tid];
         tid += blockDim.x * gridDim.x;
     }
 }
