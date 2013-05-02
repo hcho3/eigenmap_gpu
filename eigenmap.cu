@@ -6,7 +6,6 @@
 #include "book.h"
 #include <cuda_runtime.h>
 #include "eigenmap.h"
-#include <nvToolsExt.h>
 
 static int NUM_EIGS;
 
@@ -59,20 +58,14 @@ int main(int argc, char **argv)
 
 	// 2. Compute the weight matrix W
 	// 3. W = W + W'
-    nvtxRangeId_t id1 = nvtxRangeStartA("pairweight");
 	gettimeofday(&timer1, NULL);
 	pairweight(dev_w, n_patch, data_array, pos_array, scale, pos_dim[0], par, 1);
-	nvtxRangeEnd(id1);
 	
 	// 4. Compute the Laplacian L
-	nvtxRangeId_t id2 = nvtxRangeStartA("laplacian");
 	laplacian(dev_w, n_patch);
-	nvtxRangeEnd(id2);
 
 	// 5. Compute eigenvalues and eigenvectors of L
-	nvtxRangeId_t id3 = nvtxRangeStartA("eigs");
 	eigs(F, Es, dev_w, NUM_EIGS, n_patch);
-	nvtxRangeEnd(id3);
 	gettimeofday(&timer2, NULL);
 	printf("Time to compute: %.3lf ms\n", GetTimerValue(timer1, timer2));
 
