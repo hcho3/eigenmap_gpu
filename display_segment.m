@@ -16,8 +16,4 @@ for n = 1:length(index)-1
 end
 
 figure;
-segc(:, :, 1) = seg;
-segc(:, :, 2) = seg;
-segc(:, :, 3) = seg;
-image(uint8(segc));
-axis off;
+imshow(uint8(seg));

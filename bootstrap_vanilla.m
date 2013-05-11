@@ -2,14 +2,11 @@ function bootstrap_vanilla(str, par1, par2)
 % test multiscale Laplacian manifold learning
 
 tic
+
 scale = [4, 4];
 addpath('./Test_Data');
 color2d = imread(sprintf('./Test_Data/%s.jpg', str));
-if size(color2d, 3) > 1
-    gray2d = rgb2gray(color2d);
-else
-    gray2d = color2d;
-end
+gray2d = rgb2gray(color2d);
 
 image_size = size(gray2d);
 [M,N] = deal(image_size(1), image_size(2));
@@ -27,6 +24,8 @@ for i = 1:m
         patches.pos(:,idx) = [(i-1)*scale(1)+1, (j-1)*scale(2)+1]';
     end
 end
+
+%imshow( uint8(patches(:,:,1)) );
 
 %% construct weight matrix among the patches
 
@@ -46,7 +45,7 @@ W = W + W';
 
 %% perform spectral clustering
 D = diag(sum(W));
-NUM_EIGS = 15;
+NUM_EIGS = 3;
 L = eye(n_patch) - D^(-1/2)*W*D^(-1/2);
 [F,Es] = eigs(L,NUM_EIGS,'sm');
 
@@ -57,12 +56,12 @@ L = eye(n_patch) - D^(-1/2)*W*D^(-1/2);
 Es = diag(Es);
 F = diff_map(Es,F,NUM_EIGS,1);
 
-%class = kmeans(F(:,2),2);
+%class = kmeans(F(:,2:3),2);
 %figure; group1 = find(class==1); plot(F(group1,2),F(group1,3),'.');
 %hold on; group2 = find(class==2); plot(F(group2,2),F(group2,3),'.r')
 
 th = 0e-3;
-group = find(F(:,2)<=th);
+group = find(F(:,2)>th);
 display_segment(gray2d,scale,group);
 saveas(gcf, sprintf('results/%s/%s_%d_%d.eps', str, str, par1, par2), 'eps2c');
 
