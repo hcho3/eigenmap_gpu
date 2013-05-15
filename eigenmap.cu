@@ -58,16 +58,26 @@ int main(int argc, char **argv)
 
 	// 2. Compute the weight matrix W
 	// 3. W = W + W'
+    double time_w, time_l, time_eig;
 	gettimeofday(&timer1, NULL);
 	pairweight(dev_w, n_patch, data_array, pos_array, scale, pos_dim[0], par, 1);
+	gettimeofday(&timer2, NULL);
+	printf("Time to compute W: %.3lf ms\n", (time_w = GetTimerValue(timer1, timer2)) );
 	
 	// 4. Compute the Laplacian L
+	gettimeofday(&timer1, NULL);
 	laplacian(dev_w, n_patch);
+	gettimeofday(&timer2, NULL);
+	printf("Time to compute L: %.3lf ms\n", (time_l = GetTimerValue(timer1, timer2)) );
 
 	// 5. Compute eigenvalues and eigenvectors of L
+	gettimeofday(&timer1, NULL);
 	eigs(F, Es, dev_w, NUM_EIGS, n_patch);
 	gettimeofday(&timer2, NULL);
-	printf("Time to compute: %.3lf ms\n", GetTimerValue(timer1, timer2));
+	printf("Time to compute eigensystem: %.3lf ms\n", (time_eig = GetTimerValue(timer1, timer2)) );
+
+	printf("Total: %.3lf ms\n", time_w + time_l + time_eig );
+
 
 	// 6. output the result to L.mat
 	write_mat(F, Es, n_patch);

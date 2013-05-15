@@ -29,7 +29,7 @@ save(sprintf('%s.mat', str), 'patches');
 %imshow( uint8(patches(:,:,1)) );
 
 %% construct weight matrix among the patches
-NUM_EIGS = 15;
+NUM_EIGS = 3;
 [status, ~] = system(sprintf('./eigenmap %s.mat %d %d %d', str, NUM_EIGS, par1, par2), '-echo');
 if status > 0
     return
