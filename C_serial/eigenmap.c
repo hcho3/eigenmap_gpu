@@ -5,9 +5,10 @@
 #include <sys/time.h>
 #include "eigenmap.h"
 
-int NUM_EIGS;
+static int NUM_EIGS, LANCZOS_ITR;
 
 double GetTimerValue(struct timeval time_1, struct timeval time_2);
+
 void read_mat(const char *filename, double **data_array, double **pos_array, size_t *data_dim, size_t *pos_dim);
 void write_mat(double *F, double *Es, int n_patch);
 int main(int argc, char **argv)
@@ -22,21 +23,26 @@ int main(int argc, char **argv)
 	int scale[2];
 	int par[2];
 	struct timeval timer1, timer2;
+	struct timeval timer3, timer4;
 
     int i;
 
-	if (argc != 5) {
+	if (argc != 6) {
 		printf("Usage: ./eigenmap_c [MAT file containing patches] "
-		       "[# of eigenvalues] [parameter 1] [parameter 2]\n");
+		       "[# of eigenvalues] [# of Lanczos iterations] [parameter 1] [parameter 2]\n");
 		return 0;
 	}
 	if (sscanf(argv[2], "%d", &NUM_EIGS) < 1 || NUM_EIGS < 1 ||
-		sscanf(argv[3], "%d", &par[0]) < 1 || par[0] < 1 ||
-		sscanf(argv[4], "%d", &par[1]) < 1 || par[1] < 1) {
+        sscanf(argv[3], "%d", &LANCZOS_ITR) < 1 || LANCZOS_ITR < NUM_EIGS ||
+		sscanf(argv[4], "%d", &par[0]) < 1 || par[0] < 1 ||
+		sscanf(argv[5], "%d", &par[1]) < 1 || par[1] < 1) {
 		printf("Usage: ./eigenmap_c [MAT file containing patches] "
-		       "[# of eigenvalues] [parameter 1] [parameter 2]\n");
+		       "[# of eigenvalues] [# of Lanczos iterations] [parameter 1] [parameter 2]\n");
 		return 0;
 	}
+
+	gettimeofday(&timer3, NULL);
+    printf("LANCZOS_ITR = %d\n", LANCZOS_ITR);
     
 	// Read in the matlab file that contains patches structure.
 	read_mat(argv[1], &data_array, &pos_array, data_dim, pos_dim);
@@ -52,15 +58,26 @@ int main(int argc, char **argv)
 	F = (double *)malloc(n_patch * NUM_EIGS * sizeof(double));
 	Es = (double *)malloc(NUM_EIGS * sizeof(double));
 	
-	gettimeofday(&timer1, NULL);
 	// Compute the weight matrix W. And W = W + W'
+	gettimeofday(&timer1, NULL);
 	pairweight(w, n_patch, data_array, pos_array, scale, pos_dim[0], par, 1);
-	// Compute the Laplacian L
-	laplacian(l, w, n_patch);	
-	// Compute eigenvalues and eigen vectors of L
-	eigs(F, Es, l, NUM_EIGS, n_patch);
 	gettimeofday(&timer2, NULL);
-	printf("Time to compute: %.3lf ms\n", GetTimerValue(timer1, timer2));
+	printf("Time to compute W: %.3lf ms\n", GetTimerValue(timer1, timer2) );
+
+	// Compute the Laplacian L
+	gettimeofday(&timer1, NULL);
+	laplacian(l, w, n_patch);	
+	gettimeofday(&timer2, NULL);
+	printf("Time to compute L: %.3lf ms\n", GetTimerValue(timer1, timer2) );
+	// Compute eigenvalues and eigen vectors of L
+	gettimeofday(&timer1, NULL);
+	//eigs(F, Es, l, NUM_EIGS, n_patch);
+    lanczos(F, Es, l, NUM_EIGS, n_patch, LANCZOS_ITR);
+	gettimeofday(&timer2, NULL);
+	printf("Time to compute eigensystem: %.3lf ms\n", GetTimerValue(timer1, timer2));
+
+	gettimeofday(&timer4, NULL);
+	printf("Total: %.3lf ms\n", GetTimerValue(timer3, timer4));
 
 	// output the result
 	write_mat(F, Es, n_patch);
@@ -70,6 +87,8 @@ int main(int argc, char **argv)
 	free(l);
 	free(F);
 	free(Es);
+
+    return 0;
 }
 
 void read_mat(const char *filename, double **data_array, double **pos_array, size_t *data_dim, size_t *pos_dim)

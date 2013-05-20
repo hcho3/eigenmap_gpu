@@ -3,7 +3,6 @@
 #include <math.h>
 #include "eigenmap.h"
 #include <cblas.h>
-#include <matio.h>
 #include <memory.h>
 
 void diag(double *d, double *w, int n_patch);
