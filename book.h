@@ -9,6 +9,10 @@
 void HandleError( cudaError_t err,
                          const char *file,
                          int line );
+#define HANDLE_CUBLAS_ERROR( err ) (HandleCublasError( err, __FILE__, __LINE__ ))
+void HandleCublasError( int err,
+						 const char *file,
+						 int line );
 
 template< typename T >
 void swap( T& a, T& b );

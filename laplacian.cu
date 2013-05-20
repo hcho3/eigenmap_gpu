@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
-#include "book.h"
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
 #include "eigenmap.h"
+#include "book.h"
 #include <matio.h>
 
 __global__ void diag(double *dev_d, const double *dev_w, int n_patch);

@@ -1,4 +1,4 @@
-function bootstrap_vanilla(str, par1, par2)
+function bootstrap_vanilla(str, par1, par2, num_it)
 % test multiscale Laplacian manifold learning
 
 tic
@@ -32,11 +32,13 @@ end
 pars = [10, 50];
 W = zeros(n_patch);
 
+matlabpool
+
 for i = 1:n_patch
     fprintf('i = %d out of %d\n', i, n_patch);
-    for j = i+1:n_patch
-        [patch1.data, patch2.data] = deal(patches.data(:,:,i), patches.data(:,:,j));
-        [patch1.pos, patch2.pos] = deal(patches.pos(:,i), patches.pos(:,j));
+    parfor j = i+1:n_patch
+        patch1 = struct('data', patches.data(:, :, i), 'pos', patches.pos(:, i));
+        patch2 = struct('data', patches.data(:, :, j), 'pos', patches.pos(:, j));
         W(i,j) = pair_weight2(patch1, patch2, pars, 1);
     end
 end
@@ -47,7 +49,8 @@ W = W + W';
 D = diag(sum(W));
 NUM_EIGS = 3;
 L = eye(n_patch) - D^(-1/2)*W*D^(-1/2);
-[F,Es] = eigs(L,NUM_EIGS,'sm');
+[F,Es] = lanczos(L,NUM_EIGS,num_it);
+save(sprintf('L_%s.mat', str), 'L');
 
 % class = kmeans(F(:,2:3),2);
 % figure; group1 = find(class==1); plot(F(group1,2),F(group1,3),'.');
@@ -63,6 +66,5 @@ F = diff_map(Es,F,NUM_EIGS,1);
 th = 0e-3;
 group = find(F(:,2)>th);
 display_segment(gray2d,scale,group);
-saveas(gcf, sprintf('results/%s/%s_%d_%d.eps', str, str, par1, par2), 'eps2c');
-
-toc
+saveas(gcf, sprintf('results/%s/%s_%d_%d_it%d_lanczos.eps', str, str, par1, par2, num_it), 'eps2c');
+matlabpool close

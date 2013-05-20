@@ -7,12 +7,14 @@
 #include <cuda_runtime.h>
 #include "eigenmap.h"
 
-static int NUM_EIGS;
+static int NUM_EIGS, LANCZOS_ITR;
+//static char filename[50];
 
 double GetTimerValue(timeval time_1, timeval time_2);
 
 void read_mat(const char *filename, double **data_array, double **pos_array, size_t *data_dim, size_t *pos_dim);
 void write_mat(double *F, double *Es, int n_patch);
+void write_laplacian(const double *dev_l, int n_patch, const char *varname, const char *filename);
 
 int main(int argc, char **argv)
 {
@@ -25,20 +27,30 @@ int main(int argc, char **argv)
 	int scale[2];
 	int par[2];
 	timeval timer1, timer2;
+    timeval timer3, timer4;
 
-	if (argc != 5) {
+	if (argc != 6) {
 		printf("Usage: ./eigenmap [MAT file containing patches] "
-		       "[# of eigenvalues] [parameter 1] [parameter 2]\n");
+		       "[# of eigenvalues] [# of Lanczos iterations] [parameter 1] [parameter 2]\n");
 		return 0;
 	}
 
 	if (sscanf(argv[2], "%d", &NUM_EIGS) < 1 || NUM_EIGS < 1 ||
-		sscanf(argv[3], "%d", &par[0]) < 1 || par[0] < 1 ||
-		sscanf(argv[4], "%d", &par[1]) < 1 || par[1] < 1) {
+        sscanf(argv[3], "%d", &LANCZOS_ITR) < 1 || LANCZOS_ITR < NUM_EIGS ||
+		sscanf(argv[4], "%d", &par[0]) < 1 || par[0] < 1 ||
+		sscanf(argv[5], "%d", &par[1]) < 1 || par[1] < 1) {
 		printf("Usage: ./eigenmap [MAT file containing patches] "
-		       "[# of eigenvalues] [parameter 1] [parameter 2]\n");
+		       "[# of eigenvalues] [# of Lanczos iterations] [parameter 1] [parameter 2]\n");
 		return 0;
 	}
+
+    // DEBUG
+    //int i;
+    //for (i = 0; argv[1][i] != '.'; i++)
+    //    filename[i] = argv[1][i];
+    //filename[i] = '\0';
+	gettimeofday(&timer3, NULL);
+    printf("LANCZOS_ITR = %d\n", LANCZOS_ITR);
 
 	// 1. Read in the matlab file that contains patches structure.
     read_mat(argv[1], &data_array, &pos_array, data_dim, pos_dim);
@@ -58,25 +70,30 @@ int main(int argc, char **argv)
 
 	// 2. Compute the weight matrix W
 	// 3. W = W + W'
-    double time_w, time_l, time_eig;
 	gettimeofday(&timer1, NULL);
 	pairweight(dev_w, n_patch, data_array, pos_array, scale, pos_dim[0], par, 1);
 	gettimeofday(&timer2, NULL);
-	printf("Time to compute W: %.3lf ms\n", (time_w = GetTimerValue(timer1, timer2)) );
+	printf("Time to compute W: %.3lf ms\n", GetTimerValue(timer1, timer2) );
 	
 	// 4. Compute the Laplacian L
 	gettimeofday(&timer1, NULL);
 	laplacian(dev_w, n_patch);
 	gettimeofday(&timer2, NULL);
-	printf("Time to compute L: %.3lf ms\n", (time_l = GetTimerValue(timer1, timer2)) );
+	printf("Time to compute L: %.3lf ms\n", GetTimerValue(timer1, timer2) );
+    //char *tmpstr = (char *)malloc(BUFSIZ * sizeof(char) );
+    //sprintf(tmpstr, "L_%s.mat", filename);
+    //write_laplacian(dev_w, n_patch, "L", tmpstr);
+    //free(tmpstr);
 
 	// 5. Compute eigenvalues and eigenvectors of L
 	gettimeofday(&timer1, NULL);
-	eigs(F, Es, dev_w, NUM_EIGS, n_patch);
+	//eigs(F, Es, dev_w, NUM_EIGS, n_patch);
+	lanczos(F, Es, dev_w, NUM_EIGS, n_patch, LANCZOS_ITR);
 	gettimeofday(&timer2, NULL);
-	printf("Time to compute eigensystem: %.3lf ms\n", (time_eig = GetTimerValue(timer1, timer2)) );
+	printf("Time to compute eigensystem: %.3lf ms\n", GetTimerValue(timer1, timer2) );
 
-	printf("Total: %.3lf ms\n", time_w + time_l + time_eig );
+	gettimeofday(&timer4, NULL);
+	printf("Total: %.3lf ms\n", GetTimerValue(timer3, timer4));
 
 
 	// 6. output the result to L.mat
@@ -191,4 +208,22 @@ double GetTimerValue(timeval time_1, timeval time_2)
   sec  = time_2.tv_sec  - time_1.tv_sec;
   usec = time_2.tv_usec - time_1.tv_usec;
   return (1000.*(double)(sec) + (double)(usec) * 0.001);
+}
+
+void write_laplacian(const double *dev_l, int n_patch, const char *varname, const char *filename)
+{
+    mat_t *matfp;
+    matvar_t *L;
+    double *host_l = (double *)malloc(n_patch * n_patch * sizeof(double));
+    size_t L_dims[2] = {n_patch, n_patch};
+
+    matfp = Mat_CreateVer(filename, NULL, MAT_FT_DEFAULT);
+
+    cudaMemcpy(host_l, dev_l, n_patch * n_patch * sizeof(double), cudaMemcpyDeviceToHost);
+    L = Mat_VarCreate(varname, MAT_C_DOUBLE, MAT_T_DOUBLE, 2, L_dims, host_l, 0);
+    Mat_VarWrite(matfp, L, MAT_COMPRESSION_NONE);
+
+    Mat_Close(matfp);
+    Mat_VarFree(L);
+    free(host_l);
 }

@@ -26,7 +26,10 @@ eigs.o: eigs.cu
 book.o: book.cu
 	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(HOME)/include
 
-eigenmap: eigenmap.o pairweight.o laplacian.o eigs.o book.o
+lanczos.o: lanczos.cu
+	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(HOME)/include
+
+eigenmap: eigenmap.o pairweight.o laplacian.o eigs.o book.o lanczos.o
 	nvcc $(ARCH) -rdc=true -o $@ $^ $(STATIC_LIBS) $(SHARED_LIBS) $(CUDA)
 
 clean:

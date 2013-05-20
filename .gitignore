@@ -2,6 +2,9 @@ eigenmap
 eigenmap_c
 *.o
 *.mat
+*.eps
+*.txt
+*.log
 Test_Data/
 results/
 screenlog.*
