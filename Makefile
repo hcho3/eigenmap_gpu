@@ -9,7 +9,7 @@ STATIC_LIBS=$(HOME)/lib/libmatio.a \
 			$(MAGMA_PATH)/libmagma.a \
 			$(MAGMA_PATH)/libmagmablas.a
 SHARED_LIBS=-llapack -lblas -lm -lz
-CUDA=-L$(CUDA_PATH) -lcublas -lcudadevrt
+CUDA=-L$(CUDA_PATH) -lcublas -lcudadevrt -lnvToolsExt
 
 eigenmap.o: eigenmap.cu
 	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(HOME)/include

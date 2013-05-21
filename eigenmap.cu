@@ -6,6 +6,7 @@
 #include "book.h"
 #include <cuda_runtime.h>
 #include "eigenmap.h"
+#include <nvToolsExt.h>
 
 static int NUM_EIGS, LANCZOS_ITR;
 //static char filename[50];
@@ -29,6 +30,7 @@ int main(int argc, char **argv)
 	timeval timer1, timer2;
     timeval timer3, timer4;
 
+    nvtxRangePushA("input");
 	gettimeofday(&timer3, NULL);
 
 	if (argc != 6) {
@@ -62,37 +64,46 @@ int main(int argc, char **argv)
 			NUM_EIGS, par[0], par[1]);
 	printf("%lux%lux%lu\n", data_dim[0], data_dim[1], data_dim[2]);
 
+    nvtxRangePop();
+
 	/* memory allocation */
 	HANDLE_ERROR(cudaMalloc((void **)&dev_w, n_patch * n_patch * sizeof(double)));
 	HANDLE_ERROR(cudaMemset(dev_w, 0, n_patch * n_patch * sizeof(double)));
 	w = (double *)malloc(n_patch * n_patch * sizeof(double));
 	F = (double *)malloc(n_patch * NUM_EIGS * sizeof(double));
 	Es = (double *)malloc(NUM_EIGS * sizeof(double));
-
+    
 	// 2. Compute the weight matrix W
 	// 3. W = W + W'
+    nvtxRangePushA("pairweight");
 	gettimeofday(&timer1, NULL);
 	pairweight(dev_w, n_patch, data_array, pos_array, scale, pos_dim[0], par, 1);
 	gettimeofday(&timer2, NULL);
 	printf("Time to compute W: %.3lf ms\n", GetTimerValue(timer1, timer2) );
+    nvtxRangePop();
 	
 	// 4. Compute the Laplacian L
+    nvtxRangePushA("laplacian");
 	gettimeofday(&timer1, NULL);
 	laplacian(dev_w, n_patch);
 	gettimeofday(&timer2, NULL);
 	printf("Time to compute L: %.3lf ms\n", GetTimerValue(timer1, timer2) );
+    nvtxRangePop();
     //char *tmpstr = (char *)malloc(BUFSIZ * sizeof(char) );
     //sprintf(tmpstr, "L_%s.mat", filename);
     //write_laplacian(dev_w, n_patch, "L", tmpstr);
     //free(tmpstr);
 
 	// 5. Compute eigenvalues and eigenvectors of L
+    nvtxRangePushA("eigensystem");
 	gettimeofday(&timer1, NULL);
 	lanczos(F, Es, dev_w, NUM_EIGS, n_patch, LANCZOS_ITR);
 	gettimeofday(&timer2, NULL);
 	printf("Time to compute eigensystem: %.3lf ms\n", GetTimerValue(timer1, timer2) );
+    nvtxRangePop();
 
 	// 6. output the result to L.mat
+    nvtxRangePushA("output");
 	write_mat(F, Es, n_patch);
 
 	HANDLE_ERROR(cudaFree(dev_w));
@@ -104,6 +115,7 @@ int main(int argc, char **argv)
 
 	gettimeofday(&timer4, NULL);
 	printf("Total: %.3lf ms\n", GetTimerValue(timer3, timer4));
+    nvtxRangePop();
     
     return 0;
 }
