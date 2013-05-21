@@ -104,6 +104,8 @@ int main(int argc, char **argv)
 
 	gettimeofday(&timer4, NULL);
 	printf("Total: %.3lf ms\n", GetTimerValue(timer3, timer4));
+    
+    return 0;
 }
 
 void read_mat(const char *filename, double **data_array, double **pos_array, size_t *data_dim, size_t *pos_dim)
