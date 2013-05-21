@@ -30,17 +30,16 @@ magma_dsyevdx(char jobz, char range, char uplo,
 void eigs(double *F, double *Es, double *dev_l, int n_eigs, int n_patch)
 {
 	magma_int_t info;
-	magma_int_t nb, lwork, liwork, ldwa;
+	magma_int_t nb, lwork, liwork;
 	magma_int_t *iwork;
 	double *work, *wa;
 	double *lambda; /* eigenvalues */ 
-    magma_int_t ret;
+    double *l;
 
 	/* initialize constants */
 	nb = magma_get_dsytrd_nb(n_patch);
 	lwork = n_patch * nb + 6 * n_patch + 2 * n_patch * n_patch;
 	liwork = 3 + 5 * n_patch;
-    ldwa = n_patch;
 	
 	/* initialize workspaces */
 	lambda = (double *)malloc(n_patch*sizeof(double));
@@ -49,16 +48,22 @@ void eigs(double *F, double *Es, double *dev_l, int n_eigs, int n_patch)
 	work = (double *)malloc(lwork * sizeof(double));
 
 	/* Compute eigenvalues and eigenvectors */
-    ret = magma_dsyevd_gpu('V', 'L', n_patch, dev_l, n_patch, lambda, wa, ldwa, work, lwork, iwork, liwork, &info);
-    printf("ret = %d, info = %d\n", ret, info);
-    assert(MAGMA_SUCCESS == ret);
+    //ret = magma_dsyevd_gpu('V', 'L', n_patch, dev_l, n_patch, lambda, wa, ldwa, work, lwork, iwork, liwork, &info);
+    //printf("ret = %d, info = %d\n", ret, info);
+    //assert(MAGMA_SUCCESS == ret);
+
+    l = (double *)malloc(n_patch * n_patch * sizeof(double));
+    cudaMemcpy(l, dev_l, n_patch * n_patch * sizeof(double), cudaMemcpyDeviceToHost);
+    magma_int_t m;
+    assert(MAGMA_SUCCESS == magma_dsyevdx('V', 'I', 'L', n_patch, l, n_patch, 0, 0, 1, n_eigs, &m, lambda, work, lwork, iwork, liwork, &info));
 
 	/* Copy specified number of eigenvalues */
 	memcpy(Es, lambda, n_eigs * sizeof(double));
 	/* Copy the corresponding eigenvectors */
-	HANDLE_ERROR(cudaMemcpy(F, dev_l, n_eigs * n_patch * sizeof(double), cudaMemcpyDeviceToHost) );
-    //memcpy(F, l, n_eigs * n_patch * sizeof(double));
+	//HANDLE_ERROR(cudaMemcpy(F, dev_l, n_eigs * n_patch * sizeof(double), cudaMemcpyDeviceToHost) );
+    memcpy(F, l, n_eigs * n_patch * sizeof(double));
 
+    free(l);
 	free(iwork);
 	free(work);
 	free(wa);

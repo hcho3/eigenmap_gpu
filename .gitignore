@@ -1,5 +1,6 @@
 eigenmap
 eigenmap_c
+eigenmap_legacy
 *.o
 *.mat
 *.eps

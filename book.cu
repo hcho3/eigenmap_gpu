@@ -158,6 +158,20 @@ __global__ void float_to_color( uchar4 *optr,
     optr[offset].w = 255;
 }
 
+__device__ double atomicAdd(double* address, double val)
+{
+    unsigned long long int* address_as_ull =
+                              (unsigned long long int*)address;
+    unsigned long long int old = *address_as_ull, assumed;
+    do {
+        assumed = old;
+        old = atomicCAS(address_as_ull, assumed,
+                        __double_as_longlong(val +
+                               __longlong_as_double(assumed)));
+    } while (assumed != old);
+    return __longlong_as_double(old);
+}
+
 #if _WIN32
     //Create thread
     CUTThread start_thread(CUT_THREADROUTINE func, void *data){

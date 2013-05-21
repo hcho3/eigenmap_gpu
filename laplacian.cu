@@ -10,7 +10,6 @@
 
 __global__ void diag(double *dev_d, const double *dev_w, int n_patch);
 __global__ void compute_l(double *dev_w, int n_patch);
-__device__ double atomicAdd(double* address, double val);
 void diag_similarity_transform(cublasHandle_t handle, double *dev_w, int n_patch);
 
 /*
@@ -97,18 +96,4 @@ __global__ void compute_l(double *dev_w, int n_patch)
         dev_w[tid] = ((tid % (n_patch + 1) == 0) ? 1.0 : 0.0) - dev_w[tid];
         tid += blockDim.x * gridDim.x;
     }
-}
-
-__device__ double atomicAdd(double* address, double val)
-{
-    unsigned long long int* address_as_ull =
-                              (unsigned long long int*)address;
-    unsigned long long int old = *address_as_ull, assumed;
-    do {
-        assumed = old;
-        old = atomicCAS(address_as_ull, assumed,
-                        __double_as_longlong(val +
-                               __longlong_as_double(assumed)));
-    } while (assumed != old);
-    return __longlong_as_double(old);
 }

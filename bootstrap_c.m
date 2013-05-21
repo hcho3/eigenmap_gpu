@@ -1,12 +1,11 @@
-function bootstrap_c(str, par1, par2)
+function bootstrap_c(str, par1, par2, num_it)
 % test multiscale Laplacian manifold learning
-
-tic
 
 scale = [4, 4];
 addpath('./Test_Data');
 color2d = imread(sprintf('./Test_Data/%s.jpg', str));
 gray2d = rgb2gray(color2d);
+save(sprintf('gray2d_%s.mat', str), 'gray2d');
 
 image_size = size(gray2d);
 [M,N] = deal(image_size(1), image_size(2));
@@ -29,8 +28,8 @@ save(sprintf('%s.mat', str), 'patches');
 %imshow( uint8(patches(:,:,1)) );
 
 %% construct weight matrix among the patches
-NUM_EIGS = 15;
-[status, ~] = system(sprintf('./eigenmap_c %s.mat %d %d %d', str, NUM_EIGS, par1, par2), '-echo');
+NUM_EIGS = 3;
+[status, ~] = system(sprintf('./eigenmap_c %s.mat %d %d %d %d', str, NUM_EIGS, num_it, par1, par2), '-echo');
 if status > 0
     return
 end
@@ -45,6 +44,4 @@ F = diff_map(Es,F,NUM_EIGS,1);
 th = 0e-3;
 group = find(F(:,2)>th);
 display_segment(gray2d,scale,group);
-saveas(gcf, sprintf('results/%s/%s_%d_%d_C.eps', str, str, par1, par2), 'eps2c');
-
-toc
+saveas(gcf, sprintf('results/%s/%s_%d_%d_it%d_C_lanczos.eps', str, str, par1, par2, num_it), 'eps2c');

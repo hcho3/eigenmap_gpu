@@ -123,6 +123,7 @@ void lanczos(double *F, double *Es, double *dev_l, int n_eigs, int n_patch, int 
     // T = diag(alpha) + diag(beta(1:end-1), 1) + diag(beta(1:end-1), -1)
     HANDLE_ERROR( cudaMalloc((void **)&T,
                   LANCZOS_ITR * LANCZOS_ITR * sizeof(double)) );
+    HANDLE_ERROR( cudaMemset(T, 0, LANCZOS_ITR * LANCZOS_ITR * sizeof(double)) );
     build_tridiagonal<<<2, LANCZOS_ITR/2>>>(T, alpha, beta, LANCZOS_ITR);
 
     // compute approximate eigensystem

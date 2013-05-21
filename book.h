@@ -19,6 +19,7 @@ void swap( T& a, T& b );
 
 void* big_random_block( int size );
 int* big_random_block_int( int size );
+__device__ double atomicAdd(double* address, double val);
 __device__ unsigned char value( float n1, float n2, int hue );
 __global__ void float_to_color( unsigned char *optr,
                               const float *outSrc );

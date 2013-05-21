@@ -29,6 +29,8 @@ int main(int argc, char **argv)
 	timeval timer1, timer2;
     timeval timer3, timer4;
 
+	gettimeofday(&timer3, NULL);
+
 	if (argc != 6) {
 		printf("Usage: ./eigenmap [MAT file containing patches] "
 		       "[# of eigenvalues] [# of Lanczos iterations] [parameter 1] [parameter 2]\n");
@@ -49,7 +51,6 @@ int main(int argc, char **argv)
     //for (i = 0; argv[1][i] != '.'; i++)
     //    filename[i] = argv[1][i];
     //filename[i] = '\0';
-	gettimeofday(&timer3, NULL);
     printf("LANCZOS_ITR = %d\n", LANCZOS_ITR);
 
 	// 1. Read in the matlab file that contains patches structure.
@@ -87,14 +88,9 @@ int main(int argc, char **argv)
 
 	// 5. Compute eigenvalues and eigenvectors of L
 	gettimeofday(&timer1, NULL);
-	//eigs(F, Es, dev_w, NUM_EIGS, n_patch);
 	lanczos(F, Es, dev_w, NUM_EIGS, n_patch, LANCZOS_ITR);
 	gettimeofday(&timer2, NULL);
 	printf("Time to compute eigensystem: %.3lf ms\n", GetTimerValue(timer1, timer2) );
-
-	gettimeofday(&timer4, NULL);
-	printf("Total: %.3lf ms\n", GetTimerValue(timer3, timer4));
-
 
 	// 6. output the result to L.mat
 	write_mat(F, Es, n_patch);
@@ -105,6 +101,9 @@ int main(int argc, char **argv)
 	free(w);
 	free(F);
 	free(Es);
+
+	gettimeofday(&timer4, NULL);
+	printf("Total: %.3lf ms\n", GetTimerValue(timer3, timer4));
 }
 
 void read_mat(const char *filename, double **data_array, double **pos_array, size_t *data_dim, size_t *pos_dim)
