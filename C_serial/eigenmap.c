@@ -6,13 +6,16 @@
 #include "eigenmap.h"
 
 static int NUM_EIGS, LANCZOS_ITR;
+static char filename[50];
 
 double GetTimerValue(struct timeval time_1, struct timeval time_2);
 
 void read_mat(const char *filename, double **data_array, double **pos_array, size_t *data_dim, size_t *pos_dim);
 void write_mat(double *F, double *Es, int n_patch);
+
 int main(int argc, char **argv)
 {
+
 	double *data_array, *pos_array;
 	size_t data_dim[3] = {0};
 	size_t pos_dim[2] = {0};
@@ -22,16 +25,16 @@ int main(int argc, char **argv)
 	int scale[2];
 	int par[2];
 	struct timeval timer1, timer2;
-	struct timeval timer3, timer4;
-
+    struct timeval timer3, timer4;
     int i;
-
 	gettimeofday(&timer3, NULL);
+
 	if (argc != 6) {
 		printf("Usage: ./eigenmap_c [MAT file containing patches] "
 		       "[# of eigenvalues] [# of Lanczos iterations] [parameter 1] [parameter 2]\n");
 		return 0;
 	}
+
 	if (sscanf(argv[2], "%d", &NUM_EIGS) < 1 || NUM_EIGS < 1 ||
         sscanf(argv[3], "%d", &LANCZOS_ITR) < 1 || LANCZOS_ITR < NUM_EIGS ||
 		sscanf(argv[4], "%d", &par[0]) < 1 || par[0] < 1 ||
@@ -41,49 +44,65 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
+    for (i = 0; argv[1][i] != '.'; i++)
+        filename[i] = argv[1][i];
+    filename[i] = '\0';
     printf("LANCZOS_ITR = %d\n", LANCZOS_ITR);
     
-	// Read in the matlab file that contains patches structure.
-	read_mat(argv[1], &data_array, &pos_array, data_dim, pos_dim);
+	// 1. Read in the matlab file that contains patches structure.
+    read_mat(argv[1], &data_array, &pos_array, data_dim, pos_dim);
 	n_patch = (int) data_dim[2];
 	scale[0] = (int) data_dim[0];
 	scale[1] = (int) data_dim[1];
+	printf("# eigenvalues: %d\nparameter 1: %d\nparameter 2: %d\n",
+			NUM_EIGS, par[0], par[1]);
 	printf("%lux%lux%lu\n", data_dim[0], data_dim[1], data_dim[2]);
-		// memory allocation
+
+    gettimeofday(&timer2, NULL);
+	printf("Time to input: %.3lf ms\n", GetTimerValue(timer3, timer2) );
+
+	/* memory allocation */
+    gettimeofday(&timer1, NULL);
 	w = (double *)malloc(n_patch * n_patch * sizeof(double));
 	memset(w, 0, n_patch * n_patch * sizeof(double));
 	F = (double *)malloc(n_patch * NUM_EIGS * sizeof(double));
 	Es = (double *)malloc(NUM_EIGS * sizeof(double));
-	
-	// Compute the weight matrix W. And W = W + W'
+    gettimeofday(&timer2, NULL);
+	printf("Time to allocate memory: %.3lf ms\n", GetTimerValue(timer1, timer2) );
+    
+	// 2. Compute the weight matrix W
+	// 3. W = W + W'
 	gettimeofday(&timer1, NULL);
 	pairweight(w, n_patch, data_array, pos_array, scale, pos_dim[0], par, 1);
 	gettimeofday(&timer2, NULL);
 	printf("Time to compute W: %.3lf ms\n", GetTimerValue(timer1, timer2) );
-
-	// Compute the Laplacian L
+    
+	// 4. Compute the Laplacian L
 	gettimeofday(&timer1, NULL);
 	laplacian(w, n_patch);	
 	gettimeofday(&timer2, NULL);
 	printf("Time to compute L: %.3lf ms\n", GetTimerValue(timer1, timer2) );
-	// Compute eigenvalues and eigen vectors of L
+
+	// 5. Compute eigenvalues and eigenvectors of L
 	gettimeofday(&timer1, NULL);
-	//eigs(F, Es, w, NUM_EIGS, n_patch);
     lanczos(F, Es, w, NUM_EIGS, n_patch, LANCZOS_ITR);
 	gettimeofday(&timer2, NULL);
-	printf("Time to compute eigensystem: %.3lf ms\n", GetTimerValue(timer1, timer2));
+    printf("Time to compute eigensystem: %.3lf ms\n", GetTimerValue(timer1, timer2) );
 
-	// output the result
+	// 6. output the result to L.mat
+    gettimeofday(&timer1, NULL);
 	write_mat(F, Es, n_patch);
 
-	// free memory
+	free(data_array);
+	free(pos_array);
 	free(w);
 	free(F);
 	free(Es);
     
 	gettimeofday(&timer4, NULL);
+	printf("Time to output: %.3lf ms\n", GetTimerValue(timer1, timer4) );
 	printf("Total: %.3lf ms\n", GetTimerValue(timer3, timer4));
-
+    
     return 0;
 }
 
@@ -135,6 +154,7 @@ void read_mat(const char *filename, double **data_array, double **pos_array, siz
 	Mat_VarFree(patches);
 	Mat_Close(matfp);
 }
+
 void write_mat(double *F, double *Es, int n_patch)
 {
     mat_t *matfp;
@@ -142,9 +162,11 @@ void write_mat(double *F, double *Es, int n_patch)
 	size_t F_dims[2] = {n_patch, NUM_EIGS};
 	size_t Es_dims[2] = {NUM_EIGS, 1};
 
-	matfp = Mat_CreateVer("F.mat", NULL, MAT_FT_DEFAULT);
+    char *tmpstr = (char *)malloc(BUFSIZ * sizeof(char) );
+    sprintf(tmpstr, "F_%s.mat", filename);
+	matfp = Mat_CreateVer(tmpstr, NULL, MAT_FT_DEFAULT);
 	if(matfp == NULL) {
-		fprintf(stderr, "Error creating MAT file \"F.mat\"\n");
+		fprintf(stderr, "Error creating MAT file \"%s\"\n", tmpstr);
 		exit(EXIT_FAILURE);
 	}
 
@@ -160,10 +182,11 @@ void write_mat(double *F, double *Es, int n_patch)
 	
 	Mat_Close(matfp);
 
-	matfp = Mat_CreateVer("Es.mat", NULL, MAT_FT_DEFAULT);
+    sprintf(tmpstr, "Es_%s.mat", filename);
+	matfp = Mat_CreateVer(tmpstr, NULL, MAT_FT_DEFAULT);
 	
 	if(matfp == NULL) {
-		fprintf(stderr, "Error creating MAT file \"Es.mat\"\n");
+		fprintf(stderr, "Error creating MAT file \"%s\"\n", tmpstr);
 		Mat_Close(matfp);
 		exit(EXIT_FAILURE);
 	}
@@ -179,6 +202,7 @@ void write_mat(double *F, double *Es, int n_patch)
 	}
 
 	Mat_Close(matfp);
+    free(tmpstr);
 }
 
 double GetTimerValue(struct timeval time_1, struct timeval time_2)

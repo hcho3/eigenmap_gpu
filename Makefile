@@ -9,18 +9,18 @@ STATIC_LIBS=$(HOME)/lib/libmatio.a \
 			$(MAGMA_PATH)/libmagma.a \
 			$(MAGMA_PATH)/libmagmablas.a
 SHARED_LIBS=-llapack -lblas -lm -lz
-CUDA=-L$(CUDA_PATH) -lcublas -lcudadevrt -lnvToolsExt
+CUDA=-L$(CUDA_PATH) -lcublas -lcudadevrt
 
-eigenmap.o: eigenmap.cu
+eigenmap.o: eigenmap.cu eigenmap.h
 	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(HOME)/include
 	
-eigenmap_legacy.o: eigenmap_legacy.cu
+eigenmap_legacy.o: eigenmap_legacy.cu eigenmap.h
 	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(HOME)/include
 
-pairweight.o: pairweight.cu
+pairweight.o: pairweight.cu eigenmap.h
 	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(HOME)/include
 	
-laplacian.o: laplacian.cu
+laplacian.o: laplacian.cu eigenmap.h
 	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(HOME)/include
 	
 eigs.o: eigs.cu
@@ -29,7 +29,7 @@ eigs.o: eigs.cu
 book.o: book.cu
 	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(HOME)/include
 
-lanczos.o: lanczos.cu
+lanczos.o: lanczos.cu eigenmap.h
 	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(HOME)/include
 
 eigenmap: eigenmap.o pairweight.o laplacian.o book.o lanczos.o

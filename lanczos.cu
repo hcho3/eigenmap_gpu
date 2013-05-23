@@ -19,9 +19,6 @@
 /* ---- corresponding Matlab code ----
  * [F, Es] = lanczos(L, n_eigs)
  */
-static void print_dev(double *dev_v, int offset, int length, const char *name);
-__global__ void _print_dev(double *dev_v, int offset, int length, const char *name);
-
 static double norm2(double *v, int length);
 __global__ void divide_copy(double *dest, const double * src, int length, const double *divisor);
 __global__ void negate_copy(double *dest, const double * src, int length);
@@ -89,32 +86,24 @@ void lanczos(double *F, double *Es, double *dev_l, int n_eigs, int n_patch, int 
                              cudaMemcpyHostToDevice) );
 
     for (i = 1; i <= LANCZOS_ITR; i++) {
-    	//printf("\nLanczos iteration %d\n", i);
         // Q(:, i) = p / beta(i - 1)
-        //print_dev(beta, i - 1, 1, "beta");
         divide_copy<<<TPB, BPG>>>(&q[i * n_patch], p, n_patch, &beta[i - 1]);
         // p = Q(:, i - 1)
         HANDLE_CUBLAS_ERROR(cublasDcopy(handle, n_patch,
         		&q[(i - 1) * n_patch], 1, p, 1) );
-        //cudaMemcpy(r0, p, n_patch * sizeof(double), cudaMemcpyDeviceToHost);
-        //printf("norm2(p) = %.9lf\n", norm2(r0, n_patch));
         // p = L * Q(:, i) - beta(i - 1) * p
         HANDLE_CUBLAS_ERROR(cublasDsymv(handle, CUBLAS_FILL_MODE_LOWER,
         		n_patch, one, dev_l, n_patch, &q[i * n_patch], 1,
         		&neg_beta[i - 1], p, 1) );
-        //cudaMemcpy(r0, p, n_patch * sizeof(double), cudaMemcpyDeviceToHost);
-        //printf("norm2(p) = %.9lf\n", norm2(r0, n_patch));
         // alpha(i) = Q(:, i)' * p
         HANDLE_CUBLAS_ERROR(cublasDdot(handle, n_patch, &q[i * n_patch],
         		1, p, 1, &alpha[i]) );
-        //print_dev(alpha, i, 1, "alpha");
         negate_copy<<<1, 1>>>(&neg_alpha[i], &alpha[i], sizeof(double));
         // p = p - alpha(i) * Q(:, i)
         HANDLE_CUBLAS_ERROR( cublasDaxpy(handle, n_patch, &neg_alpha[i],
         		&q[i * n_patch], 1, p, 1) );
         // beta(i) = norm(p, 2)
         HANDLE_CUBLAS_ERROR( cublasDnrm2(handle, n_patch, p, 1, &beta[i]) );
-        //print_dev(beta, i, 1, "beta");
         negate_copy<<<1, 1>>>(&neg_beta[i], &beta[i], sizeof(double));
         cudaDeviceSynchronize();
     }
@@ -159,6 +148,9 @@ void lanczos(double *F, double *Es, double *dev_l, int n_eigs, int n_patch, int 
     cudaFree(beta);
     cudaFree(neg_beta);
     cudaFree(q);
+    cudaFree(one);
+    cudaFree(zero);
+    cudaFree(T);
     cublasDestroy(handle);
 }
 
@@ -202,27 +194,6 @@ __global__ void build_tridiagonal(double *T, const double * alpha, const double 
             T[(i + 1) + i * Tdim] = beta[i + 1];
         T[i + i * Tdim] = alpha[i + 1];
 
-        i += blockDim.x * gridDim.x;
-    }
-}
-static void print_dev(double *dev_v, int offset, int length, const char *name)
-{
-    char *dev_name;
-    int size = strlen(name) + 1;
-
-    cudaMalloc( (void **)&dev_name, size * sizeof(char));
-    cudaMemcpy( dev_name, name, size * sizeof(char), cudaMemcpyHostToDevice );
-
-    _print_dev<<<1, 1>>>(dev_v, offset, length, dev_name);
-    cudaDeviceSynchronize();
-    cudaFree(dev_name);
-}
-
-__global__ void _print_dev(double *dev_v, int offset, int length, const char *name)
-{
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    while (i < length) {
-        printf("%s[%d] = \t%.9lf\n", name, offset + i, dev_v[offset + i]);
         i += blockDim.x * gridDim.x;
     }
 }

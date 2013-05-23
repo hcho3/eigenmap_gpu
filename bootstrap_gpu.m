@@ -33,8 +33,8 @@ NUM_EIGS = 3;
 if status > 0
     return
 end
-load('F.mat');
-load('Es.mat');
+load(sprintf('F_%s.mat', str));
+load(sprintf('Es_%s.mat', str));
 F = diff_map(Es,F,NUM_EIGS,1);
 
 %class = kmeans(F(:,2:3),2);

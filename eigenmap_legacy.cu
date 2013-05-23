@@ -8,16 +8,16 @@
 #include "eigenmap.h"
 
 static int NUM_EIGS;
-//static char filename[50];
+static char filename[50];
 
 double GetTimerValue(timeval time_1, timeval time_2);
 
 void read_mat(const char *filename, double **data_array, double **pos_array, size_t *data_dim, size_t *pos_dim);
 void write_mat(double *F, double *Es, int n_patch);
-void write_laplacian(const double *dev_l, int n_patch, const char *varname, const char *filename);
 
 int main(int argc, char **argv)
 {
+
 	double *data_array, *pos_array;
 	size_t data_dim[3] = {0};
 	size_t pos_dim[2] = {0};
@@ -28,7 +28,7 @@ int main(int argc, char **argv)
 	int par[2];
 	timeval timer1, timer2;
     timeval timer3, timer4;
-
+    int i;
 	gettimeofday(&timer3, NULL);
 
 	if (argc != 5) {
@@ -45,12 +45,11 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-    // DEBUG
-    //int i;
-    //for (i = 0; argv[1][i] != '.'; i++)
-    //    filename[i] = argv[1][i];
-    //filename[i] = '\0';
+    for (i = 0; argv[1][i] != '.'; i++)
+        filename[i] = argv[1][i];
+    filename[i] = '\0';
 
+    
 	// 1. Read in the matlab file that contains patches structure.
     read_mat(argv[1], &data_array, &pos_array, data_dim, pos_dim);
 	n_patch = (int) data_dim[2];
@@ -60,37 +59,40 @@ int main(int argc, char **argv)
 			NUM_EIGS, par[0], par[1]);
 	printf("%lux%lux%lu\n", data_dim[0], data_dim[1], data_dim[2]);
 
+    gettimeofday(&timer2, NULL);
+	printf("Time to input: %.3lf ms\n", GetTimerValue(timer3, timer2) );
+
 	/* memory allocation */
+    gettimeofday(&timer1, NULL);
 	HANDLE_ERROR(cudaMalloc((void **)&dev_w, n_patch * n_patch * sizeof(double)));
 	HANDLE_ERROR(cudaMemset(dev_w, 0, n_patch * n_patch * sizeof(double)));
 	w = (double *)malloc(n_patch * n_patch * sizeof(double));
 	F = (double *)malloc(n_patch * NUM_EIGS * sizeof(double));
 	Es = (double *)malloc(NUM_EIGS * sizeof(double));
-
+    gettimeofday(&timer2, NULL);
+	printf("Time to allocate memory: %.3lf ms\n", GetTimerValue(timer1, timer2) );
+    
 	// 2. Compute the weight matrix W
 	// 3. W = W + W'
 	gettimeofday(&timer1, NULL);
 	pairweight(dev_w, n_patch, data_array, pos_array, scale, pos_dim[0], par, 1);
 	gettimeofday(&timer2, NULL);
 	printf("Time to compute W: %.3lf ms\n", GetTimerValue(timer1, timer2) );
-	
+    
 	// 4. Compute the Laplacian L
 	gettimeofday(&timer1, NULL);
 	laplacian(dev_w, n_patch);
 	gettimeofday(&timer2, NULL);
 	printf("Time to compute L: %.3lf ms\n", GetTimerValue(timer1, timer2) );
-    //char *tmpstr = (char *)malloc(BUFSIZ * sizeof(char) );
-    //sprintf(tmpstr, "L_%s.mat", filename);
-    //write_laplacian(dev_w, n_patch, "L", tmpstr);
-    //free(tmpstr);
 
 	// 5. Compute eigenvalues and eigenvectors of L
 	gettimeofday(&timer1, NULL);
 	eigs(F, Es, dev_w, NUM_EIGS, n_patch);
 	gettimeofday(&timer2, NULL);
-	printf("Time to compute eigensystem: %.3lf ms\n", GetTimerValue(timer1, timer2) );
+    printf("Time to compute eigensystem: %.3lf ms\n", GetTimerValue(timer1, timer2) );
 
 	// 6. output the result to L.mat
+    gettimeofday(&timer1, NULL);
 	write_mat(F, Es, n_patch);
 
 	HANDLE_ERROR(cudaFree(dev_w));
@@ -99,9 +101,12 @@ int main(int argc, char **argv)
 	free(w);
 	free(F);
 	free(Es);
-
+    
 	gettimeofday(&timer4, NULL);
+	printf("Time to output: %.3lf ms\n", GetTimerValue(timer1, timer4) );
 	printf("Total: %.3lf ms\n", GetTimerValue(timer3, timer4));
+    
+    return 0;
 }
 
 void read_mat(const char *filename, double **data_array, double **pos_array, size_t *data_dim, size_t *pos_dim)
@@ -160,9 +165,11 @@ void write_mat(double *F, double *Es, int n_patch)
 	size_t F_dims[2] = {n_patch, NUM_EIGS};
 	size_t Es_dims[2] = {NUM_EIGS, 1};
 
-	matfp = Mat_CreateVer("F.mat", NULL, MAT_FT_DEFAULT);
+    char *tmpstr = (char *)malloc(BUFSIZ * sizeof(char) );
+    sprintf(tmpstr, "F_%s.mat", filename);
+	matfp = Mat_CreateVer(tmpstr, NULL, MAT_FT_DEFAULT);
 	if(matfp == NULL) {
-		fprintf(stderr, "Error creating MAT file \"F.mat\"\n");
+		fprintf(stderr, "Error creating MAT file \"%s\"\n", tmpstr);
 		exit(EXIT_FAILURE);
 	}
 
@@ -178,10 +185,11 @@ void write_mat(double *F, double *Es, int n_patch)
 	
 	Mat_Close(matfp);
 
-	matfp = Mat_CreateVer("Es.mat", NULL, MAT_FT_DEFAULT);
+    sprintf(tmpstr, "Es_%s.mat", filename);
+	matfp = Mat_CreateVer(tmpstr, NULL, MAT_FT_DEFAULT);
 	
 	if(matfp == NULL) {
-		fprintf(stderr, "Error creating MAT file \"Es.mat\"\n");
+		fprintf(stderr, "Error creating MAT file \"%s\"\n", tmpstr);
 		Mat_Close(matfp);
 		exit(EXIT_FAILURE);
 	}
@@ -197,6 +205,7 @@ void write_mat(double *F, double *Es, int n_patch)
 	}
 
 	Mat_Close(matfp);
+    free(tmpstr);
 }
 
 double GetTimerValue(timeval time_1, timeval time_2)
@@ -205,22 +214,4 @@ double GetTimerValue(timeval time_1, timeval time_2)
   sec  = time_2.tv_sec  - time_1.tv_sec;
   usec = time_2.tv_usec - time_1.tv_usec;
   return (1000.*(double)(sec) + (double)(usec) * 0.001);
-}
-
-void write_laplacian(const double *dev_l, int n_patch, const char *varname, const char *filename)
-{
-    mat_t *matfp;
-    matvar_t *L;
-    double *host_l = (double *)malloc(n_patch * n_patch * sizeof(double));
-    size_t L_dims[2] = {n_patch, n_patch};
-
-    matfp = Mat_CreateVer(filename, NULL, MAT_FT_DEFAULT);
-
-    cudaMemcpy(host_l, dev_l, n_patch * n_patch * sizeof(double), cudaMemcpyDeviceToHost);
-    L = Mat_VarCreate(varname, MAT_C_DOUBLE, MAT_T_DOUBLE, 2, L_dims, host_l, 0);
-    Mat_VarWrite(matfp, L, MAT_COMPRESSION_NONE);
-
-    Mat_Close(matfp);
-    Mat_VarFree(L);
-    free(host_l);
 }
