@@ -17,7 +17,7 @@ eigenmap.o: eigenmap.cu eigenmap.h
 eigenmap_legacy.o: eigenmap_legacy.cu eigenmap.h
 	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(HOME)/include
 
-pairweight.o: pairweight.cu eigenmap.h
+pairweight.o: pairweight.cu
 	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(HOME)/include
 	
 laplacian.o: laplacian.cu eigenmap.h
