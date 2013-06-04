@@ -87,7 +87,7 @@ void lanczos(double *F, double *Es, double *dev_l, int n_eigs, int n_patch, int 
 
     for (i = 1; i <= LANCZOS_ITR; i++) {
         // Q(:, i) = p / beta(i - 1)
-        divide_copy<<<TPB, BPG>>>(&q[i * n_patch], p, n_patch, &beta[i - 1]);
+        divide_copy<<<BPG, TPB>>>(&q[i * n_patch], p, n_patch, &beta[i - 1]);
         // p = Q(:, i - 1)
         HANDLE_CUBLAS_ERROR(cublasDcopy(handle, n_patch,
         		&q[(i - 1) * n_patch], 1, p, 1) );
@@ -113,7 +113,7 @@ void lanczos(double *F, double *Es, double *dev_l, int n_eigs, int n_patch, int 
     HANDLE_ERROR( cudaMalloc((void **)&T,
                   LANCZOS_ITR * LANCZOS_ITR * sizeof(double)) );
     HANDLE_ERROR( cudaMemset(T, 0, LANCZOS_ITR * LANCZOS_ITR * sizeof(double)) );
-    build_tridiagonal<<<2, LANCZOS_ITR/2>>>(T, alpha, beta, LANCZOS_ITR);
+    build_tridiagonal<<<BPG, TPB>>>(T, alpha, beta, LANCZOS_ITR);
 
     // compute approximate eigensystem
 	nb = magma_get_dsytrd_nb(LANCZOS_ITR);
