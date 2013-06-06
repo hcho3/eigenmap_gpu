@@ -20,9 +20,7 @@
  * [F, Es] = lanczos(L, n_eigs)
  */
 static double norm2(double *v, int length);
-__global__ void divide_copy(double *dest, const double * src, int length, const double *divisor);
-__global__ void negate_copy(double *dest, const double * src, int length);
-__global__ void build_tridiagonal(double *T, const double *alpha, const double *beta, int Tdim);
+__global__ void divide_copy(double *dest, const double * src, int length, const double divisor);
 
 void lanczos(double *F, double *Es, double *dev_l, int n_eigs, int n_patch, int LANCZOS_ITR)
 {
@@ -30,28 +28,23 @@ void lanczos(double *F, double *Es, double *dev_l, int n_eigs, int n_patch, int 
 
     double *r0;
     double r0_norm;
-    double beta0 = 1.0;
-    double neg_beta0 = -1.0;
-    double host_one = 1.0;
-    double *one;
-    double host_zero = 0.0;
-    double *zero;
+    double one = 1.0;
+    double zero = 0.0;
 
     double *p;
     double *alpha, *neg_alpha, *beta, *neg_beta;
     double *q;
     int i;
 
-    double *T;
-    /* workspace for dsyevd */
+    /* workspace for dstedx */
 	magma_int_t info;
-	magma_int_t nb, lwork, liwork, ldwa;
+	magma_int_t lwork, liwork, ldwork;
 	magma_int_t *iwork;
-	double *work, *wa;
-	double *lambda; // eigenvalues 
+	double *work, *dwork;
+    double *eigvec, *dev_eigvec; // eigenvectors
 
     cublasCreate(&handle);
-    cublasSetPointerMode(handle, CUBLAS_POINTER_MODE_DEVICE);
+    cublasSetPointerMode(handle, CUBLAS_POINTER_MODE_HOST);
 
     // generate random r0 with norm 1.
     srand((unsigned int)time(NULL));
@@ -65,92 +58,78 @@ void lanczos(double *F, double *Es, double *dev_l, int n_eigs, int n_patch, int 
     HANDLE_ERROR( cudaMalloc((void **)&p, n_patch * sizeof(double)) );
     HANDLE_ERROR( cudaMemcpy(p, r0, n_patch * sizeof(double),
                              cudaMemcpyHostToDevice) );
-    HANDLE_ERROR( cudaMalloc((void **)&alpha,(LANCZOS_ITR+1) * sizeof(double)) );
-    HANDLE_ERROR( cudaMalloc((void **)&neg_alpha,
-                             (LANCZOS_ITR+1) * sizeof(double)) );
-    HANDLE_ERROR( cudaMalloc((void **)&beta, (LANCZOS_ITR+1) * sizeof(double)) );
-    HANDLE_ERROR( cudaMalloc((void **)&neg_beta,
-                             (LANCZOS_ITR+1) * sizeof(double)) );
+    alpha = (double *)malloc( (LANCZOS_ITR + 1) * sizeof(double) );
+    neg_alpha = (double *)malloc( (LANCZOS_ITR + 1) * sizeof(double) );
+    beta = (double *)malloc( (LANCZOS_ITR + 1) * sizeof(double) );
+    neg_beta = (double *)malloc( (LANCZOS_ITR + 1) * sizeof(double) );
     HANDLE_ERROR( cudaMalloc((void **)&q,
                              n_patch * (LANCZOS_ITR+1) * sizeof(double)) );
     HANDLE_ERROR( cudaMemset(&q[0], 0, n_patch * sizeof(double)) ); // q0 = 0
-    HANDLE_ERROR( cudaMemcpy(&beta[0], &beta0, sizeof(double),
-                             cudaMemcpyHostToDevice) );
-    HANDLE_ERROR( cudaMemcpy(&neg_beta[0], &neg_beta0, sizeof(double),
-                             cudaMemcpyHostToDevice) );
-    HANDLE_ERROR( cudaMalloc((void **)&one, sizeof(double)) );
-    HANDLE_ERROR( cudaMalloc((void **)&zero, sizeof(double)) );
-    HANDLE_ERROR( cudaMemcpy(one, &host_one, sizeof(double),
-                             cudaMemcpyHostToDevice) );
-    HANDLE_ERROR( cudaMemcpy(zero, &host_zero, sizeof(double),
-                             cudaMemcpyHostToDevice) );
+    beta[0] = 1.0;
+    neg_beta[0] = -1.0;
 
     for (i = 1; i <= LANCZOS_ITR; i++) {
         // Q(:, i) = p / beta(i - 1)
-        divide_copy<<<BPG, TPB>>>(&q[i * n_patch], p, n_patch, &beta[i - 1]);
+        divide_copy<<<BPG, TPB>>>(&q[i * n_patch], p, n_patch, beta[i - 1]);
         // p = Q(:, i - 1)
         HANDLE_CUBLAS_ERROR(cublasDcopy(handle, n_patch,
         		&q[(i - 1) * n_patch], 1, p, 1) );
         // p = L * Q(:, i) - beta(i - 1) * p
         HANDLE_CUBLAS_ERROR(cublasDsymv(handle, CUBLAS_FILL_MODE_LOWER,
-        		n_patch, one, dev_l, n_patch, &q[i * n_patch], 1,
+        		n_patch, &one, dev_l, n_patch, &q[i * n_patch], 1,
         		&neg_beta[i - 1], p, 1) );
         // alpha(i) = Q(:, i)' * p
         HANDLE_CUBLAS_ERROR(cublasDdot(handle, n_patch, &q[i * n_patch],
         		1, p, 1, &alpha[i]) );
-        negate_copy<<<1, 1>>>(&neg_alpha[i], &alpha[i], sizeof(double));
+        neg_alpha[i] = -alpha[i];
         // p = p - alpha(i) * Q(:, i)
         HANDLE_CUBLAS_ERROR( cublasDaxpy(handle, n_patch, &neg_alpha[i],
-        		&q[i * n_patch], 1, p, 1) );
+                &q[i * n_patch], 1, p, 1) );
         // beta(i) = norm(p, 2)
         HANDLE_CUBLAS_ERROR( cublasDnrm2(handle, n_patch, p, 1, &beta[i]) );
-        negate_copy<<<1, 1>>>(&neg_beta[i], &beta[i], sizeof(double));
+        neg_beta[i] = -beta[i];
         cudaDeviceSynchronize();
     }
 
-    // build T whose eigensystem approximates that of L.
-    // T = diag(alpha) + diag(beta(1:end-1), 1) + diag(beta(1:end-1), -1)
-    HANDLE_ERROR( cudaMalloc((void **)&T,
-                  LANCZOS_ITR * LANCZOS_ITR * sizeof(double)) );
-    HANDLE_ERROR( cudaMemset(T, 0, LANCZOS_ITR * LANCZOS_ITR * sizeof(double)) );
-    build_tridiagonal<<<BPG, TPB>>>(T, alpha, beta, LANCZOS_ITR);
+    lwork = 1 + 4 * LANCZOS_ITR + LANCZOS_ITR * LANCZOS_ITR;
+    work = (double *)malloc(lwork * sizeof(double));
+    liwork = 3 + 5 * LANCZOS_ITR;
+    iwork = (magma_int_t *)malloc(liwork * sizeof(double));
+    ldwork = 3 * LANCZOS_ITR * LANCZOS_ITR / 2 + 3 * LANCZOS_ITR;
+    HANDLE_ERROR( cudaMalloc(&dwork, ldwork * sizeof(double)) );
+
+    eigvec = (double *)malloc(LANCZOS_ITR * LANCZOS_ITR * sizeof(double));
+    HANDLE_ERROR(cudaMalloc(&dev_eigvec, LANCZOS_ITR * LANCZOS_ITR * sizeof(double)));
 
     // compute approximate eigensystem
-	nb = magma_get_dsytrd_nb(LANCZOS_ITR);
-	lwork = LANCZOS_ITR * nb + 6 * LANCZOS_ITR + 2 * LANCZOS_ITR * LANCZOS_ITR;
-	liwork = 3 + 5 * LANCZOS_ITR;
-    ldwa = LANCZOS_ITR;
-	lambda = (double *)malloc(LANCZOS_ITR*sizeof(double));
-	wa = (double *)malloc(LANCZOS_ITR * LANCZOS_ITR * sizeof(double));
-	iwork = (magma_int_t *)malloc(liwork * sizeof(magma_int_t));
-	work = (double *)malloc(lwork * sizeof(double));
-    magma_dsyevd_gpu('V', 'L', LANCZOS_ITR, T, LANCZOS_ITR, lambda, wa, ldwa,
-                     work, lwork, iwork, liwork, &info);
+    magma_dstedx('I', LANCZOS_ITR, 0, 1, 1, LANCZOS_ITR, &alpha[1],
+                 &beta[1], eigvec, LANCZOS_ITR, work, lwork, iwork,
+                 liwork, dwork, &info);
+
 	/* Copy specified number of eigenvalues */
-	memcpy(Es, lambda, n_eigs * sizeof(double));
+	memcpy(Es, &alpha[1], n_eigs * sizeof(double));
 
     // V = Q(:, 1:k) * U
-    cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n_patch, LANCZOS_ITR,
-                LANCZOS_ITR, one, &q[n_patch], n_patch, T, LANCZOS_ITR,
-                zero, dev_l, n_patch);
+    HANDLE_ERROR(cudaMemcpy(dev_eigvec, eigvec, LANCZOS_ITR * LANCZOS_ITR * sizeof(double), cudaMemcpyHostToDevice));
+    HANDLE_CUBLAS_ERROR( cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N,
+                n_patch, LANCZOS_ITR, LANCZOS_ITR, &one, &q[n_patch],
+                n_patch, dev_eigvec, LANCZOS_ITR, &zero, dev_l, n_patch) );
 	/* Copy the corresponding eigenvectors */
 	HANDLE_ERROR(cudaMemcpy(F, dev_l, n_patch * n_eigs * sizeof(double),
                  cudaMemcpyDeviceToHost) );
 
+    free(eigvec);
 	free(iwork);
 	free(work);
-	free(wa);
-	free(lambda);
     free(r0);
+    free(alpha);
+    free(neg_alpha);
+    free(beta);
+    free(neg_beta);
     cudaFree(p);
-    cudaFree(alpha);
-    cudaFree(neg_alpha);
-    cudaFree(beta);
-    cudaFree(neg_beta);
     cudaFree(q);
-    cudaFree(one);
-    cudaFree(zero);
-    cudaFree(T);
+    cudaFree(dwork);
+    cudaFree(dev_eigvec);
     cublasDestroy(handle);
 }
 
@@ -165,35 +144,12 @@ static double norm2(double *v, int length)
     return sqrt(sum);
 }
 
-__global__ void divide_copy(double *dest, const double * src, int length, const double *divisor)
+__global__ void divide_copy(double *dest, const double * src, int length, const double divisor)
 {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
-    double factor = 1.0 / *divisor;
+    double factor = 1.0 / divisor;
     while (tid < length) {
         dest[tid] = src[tid] * factor;
         tid += blockDim.x * gridDim.x;
-    }
-}
-
-__global__ void negate_copy(double *dest, const double * src, int length)
-{
-    int tid = threadIdx.x + blockIdx.x * blockDim.x;
-    while (tid < length) {
-        dest[tid] = -src[tid];
-        tid += blockDim.x * gridDim.x;
-    }
-}
-
-__global__ void build_tridiagonal(double *T, const double * alpha, const double *beta, int Tdim)
-{
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    while (i < Tdim) {
-        if (i > 0)
-            T[(i - 1) + i * Tdim] = beta[i + 1];
-        if (i < Tdim - 1)
-            T[(i + 1) + i * Tdim] = beta[i + 1];
-        T[i + i * Tdim] = alpha[i + 1];
-
-        i += blockDim.x * gridDim.x;
     }
 }

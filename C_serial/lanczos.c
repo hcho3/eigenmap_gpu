@@ -29,10 +29,8 @@ void lanczos(double *F, double *Es, double *L, int n_eigs, int n_patch, int LANC
     double *alpha, *beta;
     double *q;
     int i;
-
-    double *T;
-
-	double *lambda; // eigenvalues 
+    
+	double *eigvec; // eigenvectors 
 
     // generate random r0 with norm 1.
     srand((unsigned int)time(NULL));
@@ -50,51 +48,39 @@ void lanczos(double *F, double *Es, double *L, int n_eigs, int n_patch, int LANC
     memset(q, 0, n_patch * sizeof(double));
 
     for (i = 1; i <= LANCZOS_ITR; i++) {
-        //printf("\nLanczos iteration %d\n", i);
         // Q(:, i) = p / beta(i - 1)
-        //printf("beta[%d] = %.9lf\n", i - 1, beta[i - 1]);
         divide_copy(&q[i * n_patch], p, n_patch, &beta[i - 1]);
         // p = Q(:, i - 1)
         cblas_dcopy(n_patch, &q[(i - 1) * n_patch], 1, p, 1);
         // p = L * Q(:, i) - beta(i - 1) * p
-        //printf("norm2(p) = %.9lf\n", norm2(p, n_patch));
         cblas_dsymv(CblasColMajor, CblasLower, n_patch, 1.0,  L,
                     n_patch, &q[i * n_patch], 1, -beta[i - 1], p, 1);
-        //printf("norm2(p) = %.9lf\n", norm2(p, n_patch));
         // alpha(i) = Q(:, i)' * p
         alpha[i] = cblas_ddot(n_patch, &q[i * n_patch], 1, p, 1);
-        //printf("alpha[%d] = %.9lf\n", i, alpha[i]);
         // p = p - alpha(i) * Q(:, i)
         cblas_daxpy(n_patch, -alpha[i], &q[i * n_patch], 1, p, 1);
         // beta(i) = norm(p, 2)
         beta[i] = cblas_dnrm2(n_patch, p, 1);
-        //printf("beta[%d] = %.9lf\n", i, beta[i]);
     }
 
-    // build T whose eigensystem approximates that of L.
-    // T = diag(alpha) + diag(beta(1:end-1), 1) + diag(beta(1:end-1), -1)
-    T = (double *)malloc(LANCZOS_ITR * LANCZOS_ITR * sizeof(double));
-    memset(T, 0, LANCZOS_ITR * LANCZOS_ITR * sizeof(double));
-    build_tridiagonal(T, alpha, beta, LANCZOS_ITR);
-
     // compute approximate eigensystem
-	lambda = (double *)malloc(LANCZOS_ITR*sizeof(double));
-    LAPACKE_dsyevd(LAPACK_COL_MAJOR, 'V', 'L', LANCZOS_ITR, T, LANCZOS_ITR,
-        lambda);
+    eigvec = (double *)malloc(LANCZOS_ITR * LANCZOS_ITR * sizeof(double));
+    LAPACKE_dstedc(LAPACK_COL_MAJOR, 'I', LANCZOS_ITR, &alpha[1], &beta[1],
+                   eigvec, LANCZOS_ITR); 
     // copy specified number of eigenvalues
-    memcpy(Es, lambda, n_eigs * sizeof(double));
+    memcpy(Es, &alpha[1], n_eigs * sizeof(double));
 
     // V = Q(:, 1:k) * U
     cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, n_patch, LANCZOS_ITR,
-        LANCZOS_ITR, 1.0, &q[n_patch], n_patch, T, LANCZOS_ITR, 0.0, L, n_patch);
+        LANCZOS_ITR, 1.0, &q[n_patch], n_patch, eigvec, LANCZOS_ITR, 0.0, L, n_patch);
     // copy the corresponding eigenvectors
     memcpy(F, L, n_patch * n_eigs * sizeof(double));
 
-    free(lambda);
     free(p);
     free(alpha);
     free(beta);
     free(q);
+    free(eigvec);
 }
 
 static double norm2(double *v, int length)
@@ -114,16 +100,4 @@ static void divide_copy(double *dest, const double *src, int length, const doubl
     int i;
     for (i = 0; i < length; i++)
         dest[i] = src[i] * factor;
-}
-
-static void build_tridiagonal(double *T, const double *alpha, const double *beta, int Tdim)
-{
-    int i;
-    for (i = 0; i < Tdim; i++) {
-        if (i > 0)
-            T[(i - 1) + i * Tdim] = beta[i + 1];
-        if (i < Tdim - 1)
-            T[(i + 1) + i * Tdim] = beta[i + 1];
-        T[i + i * Tdim] = alpha[i + 1];
-    }
 }
