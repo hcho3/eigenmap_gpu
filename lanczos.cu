@@ -24,6 +24,7 @@ __global__ void divide_copy(double *dest, const double * src, int length, const 
 
 void lanczos(double *F, double *Es, double *dev_l, int n_eigs, int n_patch, int LANCZOS_ITR)
 {
+    // declare and allocate necessary variables
 	cublasHandle_t handle;
 
     double *r0;
@@ -44,20 +45,6 @@ void lanczos(double *F, double *Es, double *dev_l, int n_eigs, int n_patch, int 
     double *eigvec, *dev_eigvec; // eigenvectors
 
     cublasCreate(&handle);
-    cublasSetPointerMode(handle, CUBLAS_POINTER_MODE_HOST);
-
-    // generate random r0 with norm 1.
-    srand((unsigned int)time(NULL));
-    r0 = (double *)malloc(n_patch * sizeof(double));
-    for (i = 0; i < n_patch; i++)
-        r0[i] = rand();
-    r0_norm = norm2(r0, n_patch);
-    for (i = 0; i < n_patch; i++)
-        r0[i] /= r0_norm;
-
-    HANDLE_ERROR( cudaMalloc((void **)&p, n_patch * sizeof(double)) );
-    HANDLE_ERROR( cudaMemcpy(p, r0, n_patch * sizeof(double),
-                             cudaMemcpyHostToDevice) );
     alpha = (double *)malloc( (LANCZOS_ITR + 1) * sizeof(double) );
     neg_alpha = (double *)malloc( (LANCZOS_ITR + 1) * sizeof(double) );
     beta = (double *)malloc( (LANCZOS_ITR + 1) * sizeof(double) );
@@ -68,9 +55,25 @@ void lanczos(double *F, double *Es, double *dev_l, int n_eigs, int n_patch, int 
     beta[0] = 1.0;
     neg_beta[0] = -1.0;
 
+    // make cuBLAS read scalar values from the host
+    cublasSetPointerMode(handle, CUBLAS_POINTER_MODE_HOST);
+
+    // initialize p with a random unit vector
+    srand((unsigned int)time(NULL));
+    r0 = (double *)malloc(n_patch * sizeof(double));
+    for (i = 0; i < n_patch; i++)
+        r0[i] = rand();
+    r0_norm = norm2(r0, n_patch);
+    for (i = 0; i < n_patch; i++)
+        r0[i] /= r0_norm;
+    HANDLE_ERROR( cudaMalloc((void **)&p, n_patch * sizeof(double)) );
+    HANDLE_ERROR( cudaMemcpy(p, r0, n_patch * sizeof(double),
+                             cudaMemcpyHostToDevice) );
+
     for (i = 1; i <= LANCZOS_ITR; i++) {
         // Q(:, i) = p / beta(i - 1)
-        divide_copy<<<BPG, TPB>>>(&q[i * n_patch], p, n_patch, beta[i - 1]);
+        divide_copy<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>
+            (&q[i * n_patch], p, n_patch, beta[i - 1]);
         // p = Q(:, i - 1)
         HANDLE_CUBLAS_ERROR(cublasDcopy(handle, n_patch,
         		&q[(i - 1) * n_patch], 1, p, 1) );
@@ -91,6 +94,7 @@ void lanczos(double *F, double *Es, double *dev_l, int n_eigs, int n_patch, int 
         cudaDeviceSynchronize();
     }
 
+    // allocate workspace for magma_dstedx
     lwork = 1 + 4 * LANCZOS_ITR + LANCZOS_ITR * LANCZOS_ITR;
     work = (double *)malloc(lwork * sizeof(double));
     liwork = 3 + 5 * LANCZOS_ITR;
@@ -101,23 +105,25 @@ void lanczos(double *F, double *Es, double *dev_l, int n_eigs, int n_patch, int 
     eigvec = (double *)malloc(LANCZOS_ITR * LANCZOS_ITR * sizeof(double));
     HANDLE_ERROR(cudaMalloc(&dev_eigvec, LANCZOS_ITR * LANCZOS_ITR * sizeof(double)));
 
-    // compute approximate eigensystem
+    // use divide-and-conquer to approximate eigenvalues
     magma_dstedx('I', LANCZOS_ITR, 0, 1, 1, LANCZOS_ITR, &alpha[1],
                  &beta[1], eigvec, LANCZOS_ITR, work, lwork, iwork,
                  liwork, dwork, &info);
 
-	/* Copy specified number of eigenvalues */
+	// Copy specified number of eigenvalues
 	memcpy(Es, &alpha[1], n_eigs * sizeof(double));
 
+    // extract eigenvectors of L from Q 
     // V = Q(:, 1:k) * U
     HANDLE_ERROR(cudaMemcpy(dev_eigvec, eigvec, LANCZOS_ITR * LANCZOS_ITR * sizeof(double), cudaMemcpyHostToDevice));
     HANDLE_CUBLAS_ERROR( cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N,
                 n_patch, LANCZOS_ITR, LANCZOS_ITR, &one, &q[n_patch],
                 n_patch, dev_eigvec, LANCZOS_ITR, &zero, dev_l, n_patch) );
-	/* Copy the corresponding eigenvectors */
+	// Copy the corresponding eigenvectors
 	HANDLE_ERROR(cudaMemcpy(F, dev_l, n_patch * n_eigs * sizeof(double),
                  cudaMemcpyDeviceToHost) );
 
+    // clean up
     free(eigvec);
 	free(iwork);
 	free(work);
@@ -144,6 +150,8 @@ static double norm2(double *v, int length)
     return sqrt(sum);
 }
 
+/* divide the src vector by a given divisor and save the
+   result to the dest vector */
 __global__ void divide_copy(double *dest, const double * src, int length, const double divisor)
 {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;

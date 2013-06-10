@@ -6,91 +6,73 @@
 #include <cuda_runtime.h>
 #include "eigenmap.h"
 
-__global__ void diff_reduce(double *dev_w, double *data, double *pos, int scale, int pos_dim, int par0, int par1, int n_patch);
+__global__ void diff_reduce(double *dev_w, double *feat, double *pos, int feat_dim, int pos_dim, int par0, int par1, int n_patch);
 
 /* pairweight calculates and modifies the weight matrix dev_w (symmetric)
  * dev_w: device pointer to allocated space for the symmetric weight matrix
- * data: the data field in patches
- * pos: the pos field in patches
- * n_patch: number of patches in patches
- * scale[0] * scale[1] : size of data field for each patch
- * pos_dim: size of pos field for each patch
+ * feat: list of features vectors
+ * pos: list of position vectors
+ * n_patch: number of patches
+ * feat_dim : dimension of each features vector
+ * pos_dim: dimension of each position vector
  * par[2]: parameters
  * option: option (not implemented so far)
  */
-
-/* ---- corresponding Matlab code ----
- * function w = pair_weight2(patch1, patch2, pars, option)
-	% diff_square
-	temp = (patch1.data - patch2.data).^2
-	ptemp = (patch1.pos - patch2.pos).^2
-
-	% reduce
-	diff1 = sum(sum(temp));
-	diff2 = sum(ptemp);
-	w1 = exp( -diff1/(numel(patch1.data)*pars(1)^2) );
-	w2 = exp( -diff2/(ndims(patch1.data)*pars(2)^2) );
-	w = w1*w2;
- */
-void pairweight(double *dev_w, int n_patch, double *data, double *pos, int scale[2], int pos_dim, int par[2], int option)
+void pairweight(double *dev_w, int n_patch, double *feat, double *pos, int feat_dim[2], int pos_dim, int par[2], int option)
 {
-	double *temp, *ptemp;
-	double *dev_data, *dev_pos;	
+	double *dev_feat, *dev_pos;	
     const dim3 grid_size((n_patch + 15) / 16, (n_patch + 15) / 16, 1);
     const dim3 block_size(16, 16, 1);
 	
-	HANDLE_ERROR(cudaMalloc((void **)&(temp), scale[0]*scale[1]*n_patch*sizeof(double)));
-	HANDLE_ERROR(cudaMalloc((void **)&(ptemp), pos_dim*n_patch*sizeof(double)));
-	HANDLE_ERROR(cudaMalloc((void **)&(dev_data), scale[0] * scale[1] * n_patch * sizeof(double)));
+	HANDLE_ERROR(cudaMalloc((void **)&dev_feat, feat_dim[0] * feat_dim[1] * n_patch * sizeof(double)));
 	HANDLE_ERROR(cudaMalloc((void **)&dev_pos, pos_dim * n_patch * sizeof(double)));
 
-	HANDLE_ERROR(cudaMemcpy(dev_data, data, scale[0] * scale[1] * n_patch * sizeof(double), cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy(dev_feat, feat, feat_dim[0] * feat_dim[1] * n_patch * sizeof(double), cudaMemcpyHostToDevice));
 	HANDLE_ERROR(cudaMemcpy(dev_pos, pos, pos_dim * n_patch * sizeof(double), cudaMemcpyHostToDevice));
 
-    diff_reduce<<<grid_size, block_size>>>(dev_w, dev_data, dev_pos, scale[0] * scale[1], pos_dim, par[0], par[1], n_patch);
+    diff_reduce<<<grid_size, block_size>>>(dev_w, dev_feat, dev_pos, feat_dim[0] * feat_dim[1], pos_dim, par[0], par[1], n_patch);
 
-	HANDLE_ERROR(cudaFree(temp));
-	HANDLE_ERROR(cudaFree(ptemp));
-	HANDLE_ERROR(cudaFree(dev_data));
+	HANDLE_ERROR(cudaFree(dev_feat));
 	HANDLE_ERROR(cudaFree(dev_pos));
 }
 
-__global__ void diff_reduce(double *dev_w, double *data, double *pos, int scale, int pos_dim, int par0, int par1, int n_patch)
+__global__ void diff_reduce(double *dev_w, double *feat, double *pos, int feat_dim, int pos_dim, int par0, int par1, int n_patch)
 {
-    int x = blockIdx.x * blockDim.x + threadIdx.x;
-    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
 
-    double data_dist = 0.0;
-    double pos_dist = 0.0;
-    int data_offx = x * scale;
-    int data_offy = y * scale;
-    int pos_offx = x * pos_dim;
-    int pos_offy = y * pos_dim;
-    double datax, datay, posx, posy;
-    int i;
+    double feat_dist = 0.0; // running entry sum of d_ij
+    double pos_dist = 0.0;  // running entry sum of f_ij
+    int feat_offi = i * feat_dim; // offset of x_i
+    int feat_offj = j * feat_dim; // offset of x_j
+    int pos_offi = i * pos_dim;   // offset of p_i
+    int pos_offj = j * pos_dim;   // offset of p_j
+    double feat_i, feat_j, pos_i, pos_j;
+    // temporary local variables for entry sum calculation
+    int k;
 
-    /*
-    W_xy = f( sum((patch_x.data - patch_y.data)^2) )
-            * g( sum((patch_x.pos - patch_y.pos)^2) )
-    where
-    f(x) = exp( -x / (scale * par0 * par0) )
-    g(x) = exp( -x / (pos_dim * par1 * par1) )
-    */
-    if (x == y || x >= n_patch || y >= n_patch)
+    if (i == j || i >= n_patch || j >= n_patch)
         return;
 
-    for (i = 0; i < scale; i++) {
-        datax = data[data_offx + i];
-        datay = data[data_offy + i];
-        data_dist += (datax - datay) * (datax - datay);
+    /* thread (i, j) computes W_ij */
+
+    // get the k-th element of difference vector d_ij
+    // and add it to feat_dist
+    for (k = 0; k < feat_dim; k++) {
+        feat_i = feat[feat_offi + k];
+        feat_j = feat[feat_offj + k];
+        feat_dist += (feat_i - feat_j) * (feat_i - feat_j);
     }
 
-    for (i = 0; i < pos_dim; i++) {
-        posx = pos[pos_offx + i];
-        posy = pos[pos_offy + i];
-        pos_dist += (posx - posy) * (posx - posy);
+    // get the k-th element of difference vector f_ij
+    // and add it to pos_dist
+    for (k = 0; k < pos_dim; k++) {
+        pos_i = pos[pos_offi + k];
+        pos_j = pos[pos_offj + k];
+        pos_dist += (pos_i - pos_j) * (pos_i - pos_j);
     }
 
-    dev_w[x + y * n_patch] = exp( -data_dist / (scale * par0 * par0))
-                              * exp( -pos_dist / (pos_dim * par1 * par1));
+    dev_w[i + j * n_patch]
+        = exp( -feat_dist / (feat_dim * par0 * par0))
+           * exp( -pos_dist / (pos_dim * par1 * par1));
 }

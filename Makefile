@@ -14,7 +14,7 @@ STATIC_LIBS=$(HOME)/lib/libmatio.a \
 			$(MAGMA_PATH)/libmagmablas.a
 SHARED_LIBS=-llapack -lblas -lm -lz
 CUDA=-L$(CUDA_PATH) -lcublas -lcudadevrt
-GRID=-D TPB=$(TPB) -D BPG=$(BPG)
+GRID=-D THREADS_PER_BLOCK=$(TPB) -D BLOCKS_PER_GRID=$(BPG)
 
 eigenmap.o: eigenmap.cu eigenmap.h
 	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(HOME)/include

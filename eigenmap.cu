@@ -12,19 +12,19 @@ static char filename[50];
 
 double GetTimerValue(timeval time_1, timeval time_2);
 
-void read_mat(const char *filename, double **data_array, double **pos_array, size_t *data_dim, size_t *pos_dim);
+void read_mat(const char *filename, double **feat_array, double **pos_array, size_t *feat_dim, size_t *pos_dim);
 void write_mat(double *F, double *Es, int n_patch);
 
 int main(int argc, char **argv)
 {
 
-	double *data_array, *pos_array;
-	size_t data_dim[3] = {0};
+	double *feat_array, *pos_array;
+	size_t feat_dim_3d[3] = {0};
 	size_t pos_dim[2] = {0};
 	double *w, *dev_w; // weight matrix.
 	double *F, *Es;
 	int n_patch;
-	int scale[2];
+	int feat_dim[2];
 	int par[2];
 	timeval timer1, timer2;
     timeval timer3, timer4;
@@ -52,13 +52,13 @@ int main(int argc, char **argv)
     printf("LANCZOS_ITR = %d\n", LANCZOS_ITR);
     
 	// 1. Read in the matlab file that contains patches structure.
-    read_mat(argv[1], &data_array, &pos_array, data_dim, pos_dim);
-	n_patch = (int) data_dim[2];
-	scale[0] = (int) data_dim[0];
-	scale[1] = (int) data_dim[1];
+    read_mat(argv[1], &feat_array, &pos_array, feat_dim_3d, pos_dim);
+	n_patch = (int) feat_dim_3d[2];
+	feat_dim[0] = (int) feat_dim_3d[0];
+	feat_dim[1] = (int) feat_dim_3d[1];
 	printf("# eigenvalues: %d\nparameter 1: %d\nparameter 2: %d\n",
 			NUM_EIGS, par[0], par[1]);
-	printf("%lux%lux%lu\n", data_dim[0], data_dim[1], data_dim[2]);
+	printf("%lux%lux%lu\n", feat_dim_3d[0], feat_dim_3d[1], feat_dim_3d[2]);
 
     gettimeofday(&timer2, NULL);
 	printf("Time to input: %.3lf ms\n", GetTimerValue(timer3, timer2) );
@@ -76,7 +76,7 @@ int main(int argc, char **argv)
 	// 2. Compute the weight matrix W
 	// 3. W = W + W'
 	gettimeofday(&timer1, NULL);
-	pairweight(dev_w, n_patch, data_array, pos_array, scale, pos_dim[0], par, 1);
+	pairweight(dev_w, n_patch, feat_array, pos_array, feat_dim, pos_dim[0], par, 1);
 	gettimeofday(&timer2, NULL);
 	printf("Time to compute W: %.3lf ms\n", GetTimerValue(timer1, timer2) );
     
@@ -97,7 +97,7 @@ int main(int argc, char **argv)
 	write_mat(F, Es, n_patch);
 
 	HANDLE_ERROR(cudaFree(dev_w));
-	free(data_array);
+	free(feat_array);
 	free(pos_array);
 	free(w);
 	free(F);
@@ -110,7 +110,7 @@ int main(int argc, char **argv)
     return 0;
 }
 
-void read_mat(const char *filename, double **data_array, double **pos_array, size_t *data_dim, size_t *pos_dim)
+void read_mat(const char *filename, double **feat_array, double **pos_array, size_t *feat_dim, size_t *pos_dim)
 {
     mat_t *matfp;
     matvar_t *patches, *data, *pos;
@@ -145,14 +145,14 @@ void read_mat(const char *filename, double **data_array, double **pos_array, siz
     }
 
 	// Allocate memory for data_array and pos_array in heap space. Modify them accordingly
-	*data_array = (double *)malloc(data->dims[0] * data->dims[1] * data->dims[2] * sizeof(double));
+	*feat_array = (double *)malloc(data->dims[0] * data->dims[1] * data->dims[2] * sizeof(double));
 	*pos_array = (double *)malloc(pos->dims[0] * pos->dims[1] * sizeof(double));
 	
-	memcpy(*data_array, data->data, data->dims[0] * data->dims[1] * data->dims[2] * sizeof(double));
+	memcpy(*feat_array, data->data, data->dims[0] * data->dims[1] * data->dims[2] * sizeof(double));
 	memcpy(*pos_array, pos->data, pos->dims[0] * pos->dims[1] * sizeof(double));
 
 	// Pass data_dim and pos_dim to main
-	memcpy(data_dim, data->dims, 3 * sizeof(size_t));
+	memcpy(feat_dim, data->dims, 3 * sizeof(size_t));
 	memcpy(pos_dim, pos->dims, 2 * sizeof(size_t));
 
 	Mat_VarFree(patches);
