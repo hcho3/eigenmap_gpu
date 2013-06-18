@@ -175,7 +175,8 @@ __device__ double atomicAdd(double* address, double val)
 #if _WIN32
     //Create thread
     CUTThread start_thread(CUT_THREADROUTINE func, void *data){
-        return CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)func, data, 0, NULL);
+        return CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)func, data, 0,
+                NULL);
     }
 
     //Wait for thread to finish

@@ -29,7 +29,8 @@ save(sprintf('%s.mat', str), 'patches');
 
 %% construct weight matrix among the patches
 NUM_EIGS = 3;
-[status, ~] = system(sprintf('./eigenmap_c %s.mat %d %d %d %d', str, NUM_EIGS, num_it, par1, par2), '-echo');
+[status, ~] = system(sprintf('./eigenmap_c %s.mat %d %d %d %d', str, ...
+                     NUM_EIGS, num_it, par1, par2), '-echo');
 if status > 0
     return
 end
@@ -44,4 +45,5 @@ F = diff_map(Es,F,NUM_EIGS,1);
 th = 0e-3;
 group = find(F(:,2)>th);
 display_segment(gray2d,scale,group);
-saveas(gcf, sprintf('results/%s/%s_%d_%d_it%d_C_lanczos.eps', str, str, par1, par2, num_it), 'eps2c');
+saveas(gcf, sprintf('results/%s/%s_%d_%d_it%d_C_lanczos.eps', str, str, ...
+       par1, par2, num_it), 'eps2c');

@@ -8,7 +8,9 @@
 #include <memory.h>
 #include <time.h>
 /*
- * lanczos computes the smallest n_eigs eigenvalues for dev_l and the corresponding eigenvectors using the Lanczos algorithm.
+ * lanczos computes the smallest n_eigs eigenvalues for dev_l and the
+ * corresponding eigenvectors using the Lanczos algorithm.
+ *
  * F: an array (n_patch by n_eigs) to store the eigenvectors
  * Es: an array (1 by n_eigs) to store the eigenvalues
  * dev_l: an array (n_patch by n_patch) representing the Laplacian matrix
@@ -18,10 +20,11 @@
  * [F, Es] = lanczos(L, n_eigs)
  */
 static double norm2(double *v, int length);
-static void divide_copy(double *dest, const double *src, int length, const double *divisor);
-static void build_tridiagonal(double *T, const double *alpha, const double *beta, int Tdim);
+static void divide_copy(double *dest, const double *src, int length,
+                        const double *divisor);
 
-void lanczos(double *F, double *Es, double *L, int n_eigs, int n_patch, int LANCZOS_ITR)
+void lanczos(double *F, double *Es, double *L, int n_eigs, int n_patch,
+             int LANCZOS_ITR)
 {
     double r0_norm;
 
@@ -71,8 +74,9 @@ void lanczos(double *F, double *Es, double *L, int n_eigs, int n_patch, int LANC
     memcpy(Es, &alpha[1], n_eigs * sizeof(double));
 
     // V = Q(:, 1:k) * U
-    cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, n_patch, LANCZOS_ITR,
-        LANCZOS_ITR, 1.0, &q[n_patch], n_patch, eigvec, LANCZOS_ITR, 0.0, L, n_patch);
+    cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, n_patch,
+                LANCZOS_ITR, LANCZOS_ITR, 1.0, &q[n_patch], n_patch, eigvec,
+                LANCZOS_ITR, 0.0, L, n_patch);
     // copy the corresponding eigenvectors
     memcpy(F, L, n_patch * n_eigs * sizeof(double));
 
@@ -94,7 +98,8 @@ static double norm2(double *v, int length)
     return sqrt(sum);
 }
 
-static void divide_copy(double *dest, const double *src, int length, const double *divisor)
+static void divide_copy(double *dest, const double *src, int length,
+                        const double *divisor)
 {
     double factor = 1.0 / *divisor;
     int i;

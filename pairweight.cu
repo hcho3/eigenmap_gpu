@@ -6,9 +6,12 @@
 #include <cuda_runtime.h>
 #include "eigenmap.h"
 
-__global__ void diff_reduce(double *dev_w, double *feat, double *pos, int feat_dim, int pos_dim, int par0, int par1, int n_patch);
+__global__ void diff_reduce(double *dev_w, double *feat, double *pos,
+                            int feat_dim, int pos_dim, int par0,
+                            int par1, int n_patch);
 
 /* pairweight calculates and modifies the weight matrix dev_w (symmetric)
+ *
  * dev_w: device pointer to allocated space for the symmetric weight matrix
  * feat: list of features vectors
  * pos: list of position vectors
@@ -18,25 +21,33 @@ __global__ void diff_reduce(double *dev_w, double *feat, double *pos, int feat_d
  * par[2]: parameters
  * option: option (not implemented so far)
  */
-void pairweight(double *dev_w, int n_patch, double *feat, double *pos, int feat_dim[2], int pos_dim, int par[2], int option)
+void pairweight(double *dev_w, int n_patch, double *feat, double *pos,
+                int feat_dim[2], int pos_dim, int par[2], int option)
 {
 	double *dev_feat, *dev_pos;	
     const dim3 grid_size((n_patch + 15) / 16, (n_patch + 15) / 16, 1);
     const dim3 block_size(16, 16, 1);
 	
-	HANDLE_ERROR(cudaMalloc((void **)&dev_feat, feat_dim[0] * feat_dim[1] * n_patch * sizeof(double)));
-	HANDLE_ERROR(cudaMalloc((void **)&dev_pos, pos_dim * n_patch * sizeof(double)));
+	HANDLE_ERROR(cudaMalloc((void **)&dev_feat, feat_dim[0] * feat_dim[1] *
+                            n_patch * sizeof(double)));
+	HANDLE_ERROR(cudaMalloc((void **)&dev_pos, pos_dim * n_patch *
+                            sizeof(double)));
 
-	HANDLE_ERROR(cudaMemcpy(dev_feat, feat, feat_dim[0] * feat_dim[1] * n_patch * sizeof(double), cudaMemcpyHostToDevice));
-	HANDLE_ERROR(cudaMemcpy(dev_pos, pos, pos_dim * n_patch * sizeof(double), cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy(dev_feat, feat, feat_dim[0] * feat_dim[1] *
+                            n_patch * sizeof(double), cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy(dev_pos, pos, pos_dim * n_patch * sizeof(double),
+                            cudaMemcpyHostToDevice));
 
-    diff_reduce<<<grid_size, block_size>>>(dev_w, dev_feat, dev_pos, feat_dim[0] * feat_dim[1], pos_dim, par[0], par[1], n_patch);
+    diff_reduce<<<grid_size, block_size>>>(dev_w, dev_feat, dev_pos,
+        feat_dim[0] * feat_dim[1], pos_dim, par[0], par[1], n_patch);
 
 	HANDLE_ERROR(cudaFree(dev_feat));
 	HANDLE_ERROR(cudaFree(dev_pos));
 }
 
-__global__ void diff_reduce(double *dev_w, double *feat, double *pos, int feat_dim, int pos_dim, int par0, int par1, int n_patch)
+__global__ void diff_reduce(double *dev_w, double *feat, double *pos,
+                            int feat_dim, int pos_dim, int par0,
+                            int par1, int n_patch)
 {
     int i = blockIdx.y * blockDim.y + threadIdx.y;
     int j = blockIdx.x * blockDim.x + threadIdx.x;

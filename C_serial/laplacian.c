@@ -12,6 +12,7 @@ static void diag_similarity_transform(double *w, int n_patch);
 
 /*
  * laplacian computes the Laplacian matrix based on the weight matrix.
+ *
  * w: the weight matrix
  * n_patch: the dimension of dev_w and dev_l
  * Note: the Laplacian matrix is computed in-place and overwrites w.
@@ -23,7 +24,7 @@ void laplacian(double *w, int n_patch)
 	 * L = eye(n_patch) - D^(-1/2)*W*D^(-1/2);
 	 */
 
-    // W <- D * W * D
+    // W <- D^(-1/2) * W * D^(-1/2)
     diag_similarity_transform(w, n_patch);
     // L <- I - W
     compute_l(w, n_patch);

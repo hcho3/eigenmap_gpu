@@ -12,7 +12,8 @@ static char filename[50];
 
 double GetTimerValue(timeval time_1, timeval time_2);
 
-void read_mat(const char *filename, double **feat_array, double **pos_array, size_t *feat_dim, size_t *pos_dim);
+void read_mat(const char *filename, double **feat_array, double **pos_array,
+              size_t *feat_dim, size_t *pos_dim);
 void write_mat(double *F, double *Es, int n_patch);
 
 int main(int argc, char **argv)
@@ -64,18 +65,20 @@ int main(int argc, char **argv)
 
 	/* memory allocation */
     gettimeofday(&timer1, NULL);
-	HANDLE_ERROR(cudaMalloc((void **)&dev_w, n_patch * n_patch * sizeof(double)));
+	HANDLE_ERROR(cudaMalloc((void **)&dev_w, n_patch*n_patch*sizeof(double)));
 	HANDLE_ERROR(cudaMemset(dev_w, 0, n_patch * n_patch * sizeof(double)));
 	w = (double *)malloc(n_patch * n_patch * sizeof(double));
 	F = (double *)malloc(n_patch * NUM_EIGS * sizeof(double));
 	Es = (double *)malloc(NUM_EIGS * sizeof(double));
     gettimeofday(&timer2, NULL);
-	printf("Time to allocate memory: %.3lf ms\n", GetTimerValue(timer1, timer2) );
+	printf("Time to allocate memory: %.3lf ms\n",
+           GetTimerValue(timer1, timer2) );
     
 	// 2. Compute the weight matrix W
 	// 3. W = W + W'
 	gettimeofday(&timer1, NULL);
-	pairweight(dev_w, n_patch, feat_array, pos_array, feat_dim, pos_dim[0], par, 1);
+	pairweight(dev_w, n_patch, feat_array, pos_array, feat_dim,
+               pos_dim[0], par, 1);
 	gettimeofday(&timer2, NULL);
 	printf("Time to compute W: %.3lf ms\n", GetTimerValue(timer1, timer2) );
     
@@ -89,7 +92,8 @@ int main(int argc, char **argv)
 	gettimeofday(&timer1, NULL);
 	eigs(F, Es, dev_w, NUM_EIGS, n_patch);
 	gettimeofday(&timer2, NULL);
-    printf("Time to compute eigensystem: %.3lf ms\n", GetTimerValue(timer1, timer2) );
+    printf("Time to compute eigensystem: %.3lf ms\n",
+           GetTimerValue(timer1, timer2) );
 
 	// 6. output the result to L.mat
     gettimeofday(&timer1, NULL);
@@ -109,7 +113,8 @@ int main(int argc, char **argv)
     return 0;
 }
 
-void read_mat(const char *filename, double **feat_array, double **pos_array, size_t *feat_dim, size_t *pos_dim)
+void read_mat(const char *filename, double **feat_array, double **pos_array,
+              size_t *feat_dim, size_t *pos_dim)
 {
     mat_t *matfp;
     matvar_t *patches, *data, *pos;
@@ -127,7 +132,8 @@ void read_mat(const char *filename, double **feat_array, double **pos_array, siz
     }
 
     if(patches->data_type != MAT_T_STRUCT) {
-        fprintf(stderr, "The variable %s is not a valid structure. Type: %d\n", patches->name, patches->data_type);
+        fprintf(stderr, "The variable %s is not a valid structure. Type: %d\n",
+                patches->name, patches->data_type);
         Mat_VarFree(patches);
         Mat_Close(matfp);
         exit(EXIT_FAILURE);
@@ -137,18 +143,24 @@ void read_mat(const char *filename, double **feat_array, double **pos_array, siz
     pos = Mat_VarGetStructFieldByName(patches, "pos", 0);
 
     if(data == NULL || pos == NULL) {
-        fprintf(stderr, "The variable %s is not a valid structure.\n", patches->name);
+        fprintf(stderr, "The variable %s is not a valid structure.\n",
+                patches->name);
         Mat_VarFree(patches);
         Mat_Close(matfp);
         exit(EXIT_FAILURE);
     }
 
-	// Allocate memory for data_array and pos_array in heap space. Modify them accordingly
-	*feat_array = (double *)malloc(data->dims[0] * data->dims[1] * data->dims[2] * sizeof(double));
-	*pos_array = (double *)malloc(pos->dims[0] * pos->dims[1] * sizeof(double));
+	// Allocate memory for data_array and pos_array in heap space.
+    // Modify them accordingly.
+	*feat_array = (double *)malloc(data->dims[0] * data->dims[1] *
+                                   data->dims[2] * sizeof(double));
+	*pos_array = (double *)malloc(pos->dims[0] * pos->dims[1] *
+                                  sizeof(double));
 	
-	memcpy(*feat_array, data->data, data->dims[0] * data->dims[1] * data->dims[2] * sizeof(double));
-	memcpy(*pos_array, pos->data, pos->dims[0] * pos->dims[1] * sizeof(double));
+	memcpy(*feat_array, data->data, data->dims[0] * data->dims[1] *
+           data->dims[2] * sizeof(double));
+	memcpy(*pos_array, pos->data, pos->dims[0] * pos->dims[1] *
+           sizeof(double));
 
 	// Pass data_dim and pos_dim to main
 	memcpy(feat_dim, data->dims, 3 * sizeof(size_t));
@@ -210,8 +222,8 @@ void write_mat(double *F, double *Es, int n_patch)
 
 double GetTimerValue(timeval time_1, timeval time_2)
 {
-  int sec, usec;
-  sec  = time_2.tv_sec  - time_1.tv_sec;
-  usec = time_2.tv_usec - time_1.tv_usec;
-  return (1000.*(double)(sec) + (double)(usec) * 0.001);
+    int sec, usec;
+    sec  = time_2.tv_sec  - time_1.tv_sec;
+    usec = time_2.tv_usec - time_1.tv_usec;
+    return (1000.*(double)(sec) + (double)(usec) * 0.001);
 }

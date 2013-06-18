@@ -13,6 +13,7 @@ __global__ void compute_l(double *dev_w, int n_patch);
 
 /*
  * laplacian computes the Laplacian matrix based on the weight matrix.
+ *
  * dev_w: the weight matrix
  * n_patch: the dimension of dev_w and dev_l
  * Note: the Laplacian matrix is computed in-place and overwrites dev_w.
@@ -34,9 +35,11 @@ void laplacian(double *dev_w, int n_patch)
     // Compute diagonal matrix
 	diag<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(dev_d, dev_w, n_patch);
 
-    // W <- D * W * D
-    cublasDdgmm(handle, CUBLAS_SIDE_LEFT, n_patch, n_patch, dev_w, n_patch, dev_d, 1, dev_w, n_patch);
-    cublasDdgmm(handle, CUBLAS_SIDE_RIGHT, n_patch, n_patch, dev_w, n_patch, dev_d, 1, dev_w, n_patch);
+    // W <- D^(-1/2) * W * D^(-1/2)
+    cublasDdgmm(handle, CUBLAS_SIDE_LEFT, n_patch, n_patch, dev_w, n_patch,
+                dev_d, 1, dev_w, n_patch);
+    cublasDdgmm(handle, CUBLAS_SIDE_RIGHT, n_patch, n_patch, dev_w, n_patch,
+                dev_d, 1, dev_w, n_patch);
 
     // L <- I - W
     compute_l<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(dev_w, n_patch);

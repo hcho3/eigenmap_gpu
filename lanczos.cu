@@ -10,7 +10,9 @@
 #include <cublas_v2.h>
 
 /*
- * lanczos computes the smallest n_eigs eigenvalues for dev_l and the corresponding eigenvectors using the Lanczos algorithm.
+ * lanczos computes the smallest n_eigs eigenvalues for dev_l and the
+ * corresponding eigenvectors using the Lanczos algorithm.
+ *
  * F: an array (n_patch by n_eigs) to store the eigenvectors
  * Es: an array (1 by n_eigs) to store the eigenvalues
  * dev_l: an array (n_patch by n_patch) representing the Laplacian matrix
@@ -20,9 +22,11 @@
  * [F, Es] = lanczos(L, n_eigs)
  */
 static double norm2(double *v, int length);
-__global__ void divide_copy(double *dest, const double * src, int length, const double divisor);
+__global__ void divide_copy(double *dest, const double * src, int length,
+                            const double divisor);
 
-void lanczos(double *F, double *Es, double *dev_l, int n_eigs, int n_patch, int LANCZOS_ITR)
+void lanczos(double *F, double *Es, double *dev_l, int n_eigs, int n_patch,
+             int LANCZOS_ITR)
 {
     // declare and allocate necessary variables
 	cublasHandle_t handle;
@@ -103,7 +107,8 @@ void lanczos(double *F, double *Es, double *dev_l, int n_eigs, int n_patch, int 
     HANDLE_ERROR( cudaMalloc(&dwork, ldwork * sizeof(double)) );
 
     eigvec = (double *)malloc(LANCZOS_ITR * LANCZOS_ITR * sizeof(double));
-    HANDLE_ERROR(cudaMalloc(&dev_eigvec, LANCZOS_ITR * LANCZOS_ITR * sizeof(double)));
+    HANDLE_ERROR(cudaMalloc(&dev_eigvec, LANCZOS_ITR * LANCZOS_ITR *
+                            sizeof(double)) );
 
     // use divide-and-conquer to approximate eigenvalues
     magma_dstedx('I', LANCZOS_ITR, 0, 1, 1, LANCZOS_ITR, &alpha[1],
@@ -115,7 +120,8 @@ void lanczos(double *F, double *Es, double *dev_l, int n_eigs, int n_patch, int 
 
     // extract eigenvectors of L from Q 
     // V = Q(:, 1:k) * U
-    HANDLE_ERROR(cudaMemcpy(dev_eigvec, eigvec, LANCZOS_ITR * LANCZOS_ITR * sizeof(double), cudaMemcpyHostToDevice));
+    HANDLE_ERROR(cudaMemcpy(dev_eigvec, eigvec, LANCZOS_ITR * LANCZOS_ITR *
+                 sizeof(double), cudaMemcpyHostToDevice));
     HANDLE_CUBLAS_ERROR( cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N,
                 n_patch, LANCZOS_ITR, LANCZOS_ITR, &one, &q[n_patch],
                 n_patch, dev_eigvec, LANCZOS_ITR, &zero, dev_l, n_patch) );
@@ -152,7 +158,8 @@ static double norm2(double *v, int length)
 
 /* divide the src vector by a given divisor and save the
    result to the dest vector */
-__global__ void divide_copy(double *dest, const double * src, int length, const double divisor)
+__global__ void divide_copy(double *dest, const double * src, int length,
+                            const double divisor)
 {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
     double factor = 1.0 / divisor;

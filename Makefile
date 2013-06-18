@@ -26,7 +26,8 @@ pairweight.o: pairweight.cu
 	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(HOME)/include
 	
 laplacian.o: laplacian.cu eigenmap.h
-	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(HOME)/include $(GRID)
+	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(HOME)/include \
+		 $(GRID)
 	
 eigs.o: eigs.cu
 	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(HOME)/include
@@ -35,7 +36,8 @@ book.o: book.cu
 	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(HOME)/include
 
 lanczos.o: lanczos.cu eigenmap.h
-	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(HOME)/include $(GRID)
+	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(HOME)/include \
+		 $(GRID)
 
 eigenmap: eigenmap.o pairweight.o laplacian.o book.o lanczos.o
 	nvcc $(ARCH) -rdc=true -o $@ $^ $(STATIC_LIBS) $(SHARED_LIBS) $(CUDA)

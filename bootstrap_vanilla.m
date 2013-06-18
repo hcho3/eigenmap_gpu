@@ -37,8 +37,10 @@ matlabpool
 for i = 1:n_patch
     fprintf('i = %d out of %d\n', i, n_patch);
     parfor j = i+1:n_patch
-        patch1 = struct('data', patches.data(:, :, i), 'pos', patches.pos(:, i));
-        patch2 = struct('data', patches.data(:, :, j), 'pos', patches.pos(:, j));
+        patch1 = struct('data', patches.data(:, :, i), 'pos', ...
+                        patches.pos(:, i));
+        patch2 = struct('data', patches.data(:, :, j), 'pos', ...
+                        patches.pos(:, j));
         W(i,j) = pair_weight2(patch1, patch2, pars, 1);
     end
 end
@@ -66,5 +68,6 @@ F = diff_map(Es,F,NUM_EIGS,1);
 th = 0e-3;
 group = find(F(:,2)>th);
 display_segment(gray2d,scale,group);
-saveas(gcf, sprintf('results/%s/%s_%d_%d_it%d_lanczos.eps', str, str, par1, par2, num_it), 'eps2c');
+saveas(gcf, sprintf('results/%s/%s_%d_%d_it%d_lanczos.eps', str, str, ...
+       par1, par2, num_it), 'eps2c');
 matlabpool close

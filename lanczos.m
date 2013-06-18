@@ -52,6 +52,7 @@ if nargin == 3
     saveas(gcf, sprintf('results/%s/%s_spectrum.eps', str, str), 'eps2c');
     figure;
     plot(1:k, lanczos_spectrum, 'b.');
-    saveas(gcf, sprintf('results/%s/%s_lanczos_spectrum.eps', str, str), 'eps2c');
+    saveas(gcf, sprintf('results/%s/%s_lanczos_spectrum.eps', str, str), ...
+           'eps2c');
 end
 %}

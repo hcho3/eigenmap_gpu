@@ -1,8 +1,11 @@
 all: eigenmap_c
 	mv eigenmap_c ..
 
+LAPACK_PATH=/usr/local/plasma2.5.0/lib/liblapacke.a
+
 eigenmap_c: eigenmap.o pairweight.o laplacian.o eigs.o lanczos.o
-	gcc -o $@ $^ $(HOME)/lib/libmatio.a /usr/local/plasma2.5.0/lib/liblapacke.a -lm -lz -llapack -lblas -I$(HOME)/include -I.
+	gcc -o $@ $^ $(HOME)/lib/libmatio.a $(LAPACK_PATH) -lm -lz -llapack \
+		-lblas -I$(HOME)/include -I.
 
 eigenmap.o: eigenmap.c
 	gcc -c $< -o $@ -I$(HOME)/include
