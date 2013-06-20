@@ -63,19 +63,6 @@ void lanczos(double *F, double *Es, double *L, int n_eigs, int n_patch,
         cblas_daxpy(n_patch, -alpha[i], &q[i * n_patch], 1, z, 1);
         // z = z - beta(i - 1) * Q(:, i - 1);
         cblas_daxpy(n_patch, -beta[i - 1], &q[(i - 1) * n_patch], 1, z, 1);
-        /* re-orthogonalize twice */
-        // b = Q(:, 1:i-1)' * z
-        cblas_dgemv(CblasColMajor, CblasTrans, n_patch, i - 1, 1.0,
-                    &q[n_patch], n_patch, z, 1, 0.0, b, 1);
-        // z = Q(:, 1:i-1) * b + (-1) * z
-        cblas_dgemv(CblasColMajor, CblasNoTrans, n_patch, i - 1, 1.0,
-                    &q[n_patch], n_patch, b, 1, -1.0, z, 1);
-        // b = Q(:, 1:i-1)' * z
-        cblas_dgemv(CblasColMajor, CblasTrans, n_patch, i - 1, 1.0,
-                    &q[n_patch], n_patch, z, 1, 0.0, b, 1);
-        // z = Q(:, 1:i-1) * b + (-1) * z
-        cblas_dgemv(CblasColMajor, CblasNoTrans, n_patch, i - 1, 1.0,
-                    &q[n_patch], n_patch, b, 1, -1.0, z, 1);
 
         // beta(i) = norm(z, 2);
         beta[i] = cblas_dnrm2(n_patch, z, 1);

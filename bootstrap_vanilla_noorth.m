@@ -1,11 +1,12 @@
-function bootstrap_gpu_full(str, par1, par2)
+function bootstrap_vanilla_noorth(str, par1, par2, num_it)
 % test multiscale Laplacian manifold learning
+
+tic
 
 scale = [4, 4];
 addpath('./Test_Data');
 color2d = imread(sprintf('./Test_Data/%s.jpg', str));
 gray2d = rgb2gray(color2d);
-save(sprintf('gray2d_%s.mat', str), 'gray2d');
 
 image_size = size(gray2d);
 [M,N] = deal(image_size(1), image_size(2));
@@ -24,18 +25,40 @@ for i = 1:m
     end
 end
 
-save(sprintf('%s.mat', str), 'patches');
 %imshow( uint8(patches(:,:,1)) );
 
 %% construct weight matrix among the patches
-NUM_EIGS = 3;
-[status, ~] = system(sprintf('./eigenmap_legacy %s.mat %d %d %d', str, ...
-                     NUM_EIGS, par1, par2), '-echo');
-if status > 0
-    return
+
+pars = [10, 50];
+W = zeros(n_patch);
+
+matlabpool
+
+for i = 1:n_patch
+    fprintf('i = %d out of %d\n', i, n_patch);
+    parfor j = i+1:n_patch
+        patch1 = struct('data', patches.data(:, :, i), 'pos', ...
+                        patches.pos(:, i));
+        patch2 = struct('data', patches.data(:, :, j), 'pos', ...
+                        patches.pos(:, j));
+        W(i,j) = pair_weight2(patch1, patch2, pars, 1);
+    end
 end
-load(sprintf('F_%s.mat', str));
-load(sprintf('Es_%s.mat', str));
+
+W = W + W';
+
+%% perform spectral clustering
+D = diag(sum(W));
+NUM_EIGS = 3;
+L = eye(n_patch) - D^(-1/2)*W*D^(-1/2);
+[F,Es] = lanczos_noorth(L,NUM_EIGS,num_it);
+save(sprintf('L_%s.mat', str), 'L');
+
+% class = kmeans(F(:,2:3),2);
+% figure; group1 = find(class==1); plot(F(group1,2),F(group1,3),'.');
+% hold on; group2 = find(class==2); plot(F(group2,2),F(group2,3),'.r')
+
+Es = diag(Es);
 F = diff_map(Es,F,NUM_EIGS,1);
 
 %class = kmeans(F(:,2:3),2);
@@ -45,5 +68,7 @@ F = diff_map(Es,F,NUM_EIGS,1);
 th = 0e-3;
 group = find(F(:,2)>th);
 display_segment(gray2d,scale,group);
-print('-depsc2', '-r1200', sprintf('results/%s/%s_%d_%d_gpu.eps',...
-      str, str, par1, par2));
+print('-depsc2', '-r1200', ...
+    sprintf('results/%s/%s_%d_%d_it%d_noorth_lanczos.eps',...
+    str, str, par1, par2, num_it));
+matlabpool close

@@ -87,19 +87,6 @@ void lanczos(double *F, double *Es, double *dev_L, int n_eigs, int n_patch,
         // z = z - beta(i - 1) * Q(:, i - 1);
         cublasDaxpy(handle, n_patch, &neg_beta[i - 1], &q[(i - 1) * n_patch],
                     1, z, 1);
-        /* re-orthogonalize twice */
-        // w = Q(:, 1:i-1)' * z
-        cublasDgemv(handle, CUBLAS_OP_T, n_patch, i - 1, &constants[2],
-                    &q[n_patch], n_patch, z, 1, &constants[1], w, 1);
-        // z = Q(:, 1:i-1) * w + (-1) * z
-        cublasDgemv(handle, CUBLAS_OP_N, n_patch, i - 1, &constants[2],
-                    &q[n_patch], n_patch, w, 1, &constants[0], z, 1);
-        // w = Q(:, 1:i-1)' * z
-        cublasDgemv(handle, CUBLAS_OP_T, n_patch, i - 1, &constants[2],
-                    &q[n_patch], n_patch, z, 1, &constants[1], w, 1);
-        // z = Q(:, 1:i-1) * w + (-1) * z
-        cublasDgemv(handle, CUBLAS_OP_N, n_patch, i - 1, &constants[2],
-                    &q[n_patch], n_patch, w, 1, &constants[0], z, 1);
 
         // beta(i) = norm(z, 2);
         cublasDnrm2(handle, n_patch, z, 1, &beta[i]);

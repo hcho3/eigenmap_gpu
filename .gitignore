@@ -1,5 +1,7 @@
 eigenmap
+eigenmap_noorth
 eigenmap_c
+eigenmap_c_noorth
 eigenmap_legacy
 *.o
 *.mat

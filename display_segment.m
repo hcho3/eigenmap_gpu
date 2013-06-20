@@ -15,5 +15,6 @@ for n = 1:length(index)-1
     seg(x_range, y_range) = 255;
 end
 
+set(0,'DefaultFigureMenu','none');
 figure;
-imshow(uint8(seg));
+imshow(uint8(seg), 'Border', 'tight');

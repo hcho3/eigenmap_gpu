@@ -1,4 +1,4 @@
-function [V, D] = lanczos(A, num_eigs, k)
+function [V, D] = lanczos_noorth(A, num_eigs, k)
 
 tic
 n = size(A, 1);
@@ -11,6 +11,7 @@ z = zeros(n, 1);
 % generate random b with norm 1.
 b = rand(n, 1);
 b = b / norm(b, 2);
+
 Q(:, 1) = b;
 
 for i=1:k
@@ -21,17 +22,6 @@ for i=1:k
     else
         z = z - alpha(i) * Q(:, i) - beta(i - 1) * Q(:, i - 1);
     end
-    % re-orthogonalize twice
-    s = zeros(n, 1);
-    for j=1:i-1
-        s = s + (z' * Q(:, j)) * Q(:, j);
-    end
-    z = z - s;
-    s = zeros(n, 1);
-    for j=1:i-1
-        s = s + (z' * Q(:, j)) * Q(:, j);
-    end
-    z = z - s;
 
     beta(i) = norm(z, 2);
     Q(:, i + 1) = z / beta(i);

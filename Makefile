@@ -1,5 +1,6 @@
 all: eigenmap
 legacy: eigenmap_legacy
+noorth: eigenmap_noorth
 
 ARCH=-arch=sm_35
 
@@ -39,11 +40,18 @@ lanczos.o: lanczos.cu eigenmap.h
 	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(HOME)/include \
 		 $(GRID)
 
+lanczos_noorth.o: lanczos_noorth.cu eigenmap.h
+	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(HOME)/include \
+		 $(GRID)
+
 eigenmap: eigenmap.o pairweight.o laplacian.o book.o lanczos.o
 	nvcc $(ARCH) -rdc=true -o $@ $^ $(STATIC_LIBS) $(SHARED_LIBS) $(CUDA)
 
 eigenmap_legacy: eigenmap_legacy.o pairweight.o laplacian.o book.o eigs.o
 	nvcc $(ARCH) -rdc=true -o $@ $^ $(STATIC_LIBS) $(SHARED_LIBS) $(CUDA)
 
+eigenmap_noorth: eigenmap.o pairweight.o laplacian.o book.o lanczos_noorth.o
+	nvcc $(ARCH) -rdc=true -o $@ $^ $(STATIC_LIBS) $(SHARED_LIBS) $(CUDA)
+
 clean:
-	rm -f eigenmap eigenmap_legacy *.o
+	rm -f eigenmap eigenmap_legacy eigenmap_noorth *.o

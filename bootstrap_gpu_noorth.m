@@ -1,4 +1,4 @@
-function bootstrap_gpu_full(str, par1, par2)
+function bootstrap_gpu_noorth(str, par1, par2, num_it)
 % test multiscale Laplacian manifold learning
 
 scale = [4, 4];
@@ -29,8 +29,8 @@ save(sprintf('%s.mat', str), 'patches');
 
 %% construct weight matrix among the patches
 NUM_EIGS = 3;
-[status, ~] = system(sprintf('./eigenmap_legacy %s.mat %d %d %d', str, ...
-                     NUM_EIGS, par1, par2), '-echo');
+[status, ~] = system(sprintf('./eigenmap_noorth %s.mat %d %d %d %d', str, ...
+                     NUM_EIGS, num_it, par1, par2), '-echo');
 if status > 0
     return
 end
@@ -45,5 +45,6 @@ F = diff_map(Es,F,NUM_EIGS,1);
 th = 0e-3;
 group = find(F(:,2)>th);
 display_segment(gray2d,scale,group);
-print('-depsc2', '-r1200', sprintf('results/%s/%s_%d_%d_gpu.eps',...
-      str, str, par1, par2));
+print('-depsc2', '-r1200', ...
+    sprintf('results/%s/%s_%d_%d_it%d_gpu_noorth_lanczos.eps',...
+    str, str, par1, par2, num_it));
