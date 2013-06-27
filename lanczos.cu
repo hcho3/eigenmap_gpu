@@ -30,10 +30,10 @@ void lanczos(double *F, double *Es, double *dev_L, int n_eigs, int n_patch,
 {
     // declare and allocate necessary variables
 	cublasHandle_t handle;
+    double neg_one = -1.0, one = 1.0, zero = 0.0;
 
     double *b;
     double b_norm;
-    double constants[] = {-1.0, 0.0, 1.0};
 
     double *z, *w;
     double *alpha, *beta;
@@ -77,8 +77,8 @@ void lanczos(double *F, double *Es, double *dev_L, int n_eigs, int n_patch,
 
     for (i = 1; i <= LANCZOS_ITR; i++) {
         // z = L * Q(:, i)
-        cublasDsymv(handle, CUBLAS_FILL_MODE_LOWER, n_patch, &constants[2],
-                    dev_L, n_patch, &q[i * n_patch], 1, &constants[1], z, 1);
+        cublasDsymv(handle, CUBLAS_FILL_MODE_LOWER, n_patch, &one,
+                    dev_L, n_patch, &q[i * n_patch], 1, &zero, z, 1);
         // alpha(i) = Q(:, i)' * z;
         cublasDdot(handle, n_patch, &q[i * n_patch], 1, z, 1, &alpha[i]);
         neg_alpha[i] = -alpha[i];
@@ -89,17 +89,17 @@ void lanczos(double *F, double *Es, double *dev_L, int n_eigs, int n_patch,
                     1, z, 1);
         /* re-orthogonalize twice */
         // w = Q(:, 1:i-1)' * z
-        cublasDgemv(handle, CUBLAS_OP_T, n_patch, i - 1, &constants[2],
-                    &q[n_patch], n_patch, z, 1, &constants[1], w, 1);
+        cublasDgemv(handle, CUBLAS_OP_T, n_patch, i - 1, &one,
+                    &q[n_patch], n_patch, z, 1, &zero, w, 1);
         // z = Q(:, 1:i-1) * w + (-1) * z
-        cublasDgemv(handle, CUBLAS_OP_N, n_patch, i - 1, &constants[2],
-                    &q[n_patch], n_patch, w, 1, &constants[0], z, 1);
+        cublasDgemv(handle, CUBLAS_OP_N, n_patch, i - 1, &one,
+                    &q[n_patch], n_patch, w, 1, &neg_one, z, 1);
         // w = Q(:, 1:i-1)' * z
-        cublasDgemv(handle, CUBLAS_OP_T, n_patch, i - 1, &constants[2],
-                    &q[n_patch], n_patch, z, 1, &constants[1], w, 1);
+        cublasDgemv(handle, CUBLAS_OP_T, n_patch, i - 1, &one,
+                    &q[n_patch], n_patch, z, 1, &zero, w, 1);
         // z = Q(:, 1:i-1) * w + (-1) * z
-        cublasDgemv(handle, CUBLAS_OP_N, n_patch, i - 1, &constants[2],
-                    &q[n_patch], n_patch, w, 1, &constants[0], z, 1);
+        cublasDgemv(handle, CUBLAS_OP_N, n_patch, i - 1, &one,
+                    &q[n_patch], n_patch, w, 1, &neg_one, z, 1);
 
         // beta(i) = norm(z, 2);
         cublasDnrm2(handle, n_patch, z, 1, &beta[i]);
@@ -135,8 +135,8 @@ void lanczos(double *F, double *Es, double *dev_L, int n_eigs, int n_patch,
     HANDLE_ERROR(cudaMemcpy(dev_eigvec, eigvec, LANCZOS_ITR * LANCZOS_ITR *
                  sizeof(double), cudaMemcpyHostToDevice));
     HANDLE_CUBLAS_ERROR( cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N,
-                n_patch, LANCZOS_ITR, LANCZOS_ITR, &constants[2], &q[n_patch],
-                n_patch, dev_eigvec, LANCZOS_ITR, &constants[1], dev_L,
+                n_patch, LANCZOS_ITR, LANCZOS_ITR, &one, &q[n_patch],
+                n_patch, dev_eigvec, LANCZOS_ITR, &zero, dev_L,
                 n_patch) );
 	// Copy the corresponding eigenvectors
 	HANDLE_ERROR(cudaMemcpy(F, dev_L, n_patch * n_eigs * sizeof(double),
