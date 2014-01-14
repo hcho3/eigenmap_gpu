@@ -8,7 +8,13 @@ eigenmap_legacy
 *.eps
 *.txt
 *.log
-Test_Data/
+Test_Data/*
+!Test_Data/KPIS001.jpg
+!Test_Data/nCPM4.jpg
+!Test_Data/capillary_skeletal_muscle.jpg
+!Test_Data/capillary_retina.jpg
+!Test_Data/nCPM9.jpg
+!Test_Data/nCPM9_large.jpg
 results/
 screenlog.*
 midreport_04082013/
