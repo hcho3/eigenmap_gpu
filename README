@@ -1,0 +1,64 @@
+GPU accelerated vessel segmentation using Laplacian eigenmaps
+
+SYNOPSIS
+    Laplacian eigenmap is an image segmentation algorithm that began to gain
+    traction in recent years. It involves a generalized eigenvalue problem
+    which extracts high-level features from local neighborhood information.
+    Unfortunately, it is computationally costly to compute eigenvalues of a
+    large linear systems. We make use of general-purpose GPUs to accelerate the
+    segmentation process.
+
+DOCUMENTATION
+    See http://www.hyunsu-cho.org/eigenmap_gpu.html.
+
+DEPENDENCIES
+    1. MAT file I/O Library              --> See Step 1 of HOW TO COMPILE
+       http://matio.sourceforge.net/
+
+    2. MAGMA (Matrix Algebra on GPU and Multicore Architectures)
+       http://icl.cs.utk.edu/magma/index.html
+
+    3. ATLAS (Automatically Tuned Linear Algebra Software)
+       http://math-atlas.sourceforge.net/
+
+HOW TO COMPILE
+    1. Run ./get_matio.sh to automatically download and install the MAT file
+       I/O Library. This library is required to read and write in MATLAB's
+       binary MAT file format.
+    
+    2. Open the Makefile and edit the system paths (lines 13-16) as necessary.
+
+    3. Run make.
+
+HOW TO RUN
+    To make things easier, we rely on MATLAB's image processing facilities when
+    it comes to pre-/post-processing. Hence, do the following steps:
+
+    1. Put the input image in Test_Data directory. The image must have jpg
+       extension.
+
+    2. Launch MATLAB in graphical mode.
+    
+    3. Run one of the bootstrap scripts with the name of the image. Each script
+       has a suffix that represents a distinct scenario:
+
+       - bootstrap_c(...)   : compute Laplacian eigenmap using one CPU thread
+       - bootstrap_omp(...) : use many CPU threads
+       - bootstrap_gpu(...) : use one GPU device instead
+       - bootstrap_vanilla(...) : use one CPU thread; really slow because the
+         entire script is written in MATLAB's scripting language
+
+       To get an intuitive feeling of how the bootstrap scripts look like, take
+       a quick look at  test.m.
+
+       More precisely, bootstrap calls share the following form:
+
+       bootstrap_x('image_name', [param1], [param2], [# of Lanczos iterations]) 
+    
+       For instance, if the input image is example.jpg, the parameters are 10
+       and 50, and the number of Lanczos iterations is 75, use:
+
+       bootstrap_x('example', 10, 50, 75);
+
+    4. The segmented images pop up as figures and at the same time are saved in
+       results directory.
