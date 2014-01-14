@@ -62,3 +62,11 @@ HOW TO RUN
 
     4. The segmented images pop up as figures and at the same time are saved in
        results directory.
+
+FUNCTION SUMMARY
+    -  pairweight: computes the weight matrix.
+    -  laplacian:  computes the Laplacian matrix from the weight matrix.
+    -  eigs:       computes a few smallest eigenvalues of the Laplacian matrix;
+                   uses general symmetric eigenvalue solver.
+    -  lanczos:    computes a few smallest eigenvalues of the Laplacian matrix;
+                   uses the Lanczos method. 
