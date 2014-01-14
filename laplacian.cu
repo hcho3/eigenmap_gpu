@@ -20,10 +20,6 @@ __global__ void compute_l(double *dev_w, int n_patch);
  */
 void laplacian(double *dev_w, int n_patch)
 {
-	/* ---- corresponding Matlab code ----
-	 * D = diag(sum(W));
-	 * L = eye(n_patch) - D^(-1/2)*W*D^(-1/2);
-	 */
 	cublasHandle_t handle;
     double *dev_d;
 

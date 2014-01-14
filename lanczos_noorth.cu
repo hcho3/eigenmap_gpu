@@ -18,9 +18,6 @@
  * dev_L: an array (n_patch by n_patch) representing the Laplacian matrix
  * n_patch: the dimension of dev_L
  */
-/* ---- corresponding Matlab code ----
- * [F, Es] = lanczos(L, n_eigs)
- */
 static double norm2(double *v, int length);
 __global__ void divide_copy(double *dest, const double *src, int length,
                             const double divisor);

@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <omp.h>
 #include "eigenmap.h"
 
 void diff_reduce(double *w, double *feat, double *pos, int feat_dim,
                  int pos_dim, int par0, int par1, int n_patch);
+
 /* pairweight calculates and modifies the weight matrix w (symmetric)
  *
  * w: pointer to allocated space for the symmetric weight matrix
@@ -36,6 +38,10 @@ void diff_reduce(double *w, double *feat, double *pos, int feat_dim,
     double feat_i, feat_j, pos_i, pos_j;
     // temporary local variables for entry sum calculation
 
+    #pragma omp parallel for shared(w, feat, pos) \
+        firstprivate(n_patch, feat_dim, pos_dim, par0, par1) \
+        private(feat_dist, pos_dist, feat_offi, feat_offj, \
+        pos_offi, pos_offj, feat_i, feat_j, pos_i, pos_j, i, j, k)
     for (i = 0; i < n_patch; i++) {
         for (j = 0; j < n_patch; j++) {
             if (i != j) {

@@ -3,16 +3,14 @@ all: eigenmap_c
 noorth: eigenmap_c_noorth
 	mv eigenmap_c_noorth ..
 
-MATIO=$(HOME)/lib/libmatio.a
-LAPACKE=/usr/local/plasma2.5.0/lib/liblapacke.a
-ATLAS_PATH=/usr/local/atlas3.10.1/lib/
+LAPACK_PATH=/usr/local/plasma2.5.0/lib/liblapacke.a
 
 eigenmap_c: eigenmap.o pairweight.o laplacian.o eigs.o lanczos.o
-	gcc -o $@ $^ $(MATIO) --static $(LAPACKE) -L$(ATLAS_PATH) \
-		-llapack -lcblas -lf77blas -latlas -lgfortran -lz -lm -lpthread -I.
+	gcc -o $@ $^ $(HOME)/lib/libmatio.a $(LAPACK_PATH) -lm -lz -llapack \
+		-lblas -I$(HOME)/include -I.
 eigenmap_c_noorth: eigenmap.o pairweight.o laplacian.o eigs.o lanczos_noorth.o
-	gcc -o $@ $^ $(MATIO) --static $(LAPACKE) -L$(ATLAS_PATH) \
-		-llapack -lcblas -lf77blas -latlas -lgfortran -lz -lm -lpthread -I.
+	gcc -o $@ $^ $(HOME)/lib/libmatio.a $(LAPACK_PATH) -lm -lz -llapack \
+		-lblas -I$(HOME)/include -I.
 
 eigenmap.o: eigenmap.c
 	gcc -c $< -o $@ -I$(HOME)/include
