@@ -1,4 +1,4 @@
-all: eigenmap
+all: eigenmap legacy
 legacy: eigenmap_legacy
 noorth: eigenmap_noorth
 
@@ -37,7 +37,8 @@ laplacian.o: laplacian.cu eigenmap.h
 		 $(GRID)
 	
 eigs.o: eigs.cu
-	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(MATIO_INC)
+	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(MATIO_INC) \
+		 -I$(MAGMA_INC)
 	
 book.o: book.cu
 	nvcc $(ARCH) -rdc=true -c $< -o $@ -Xcompiler -fPIC -I$(MATIO_INC)
