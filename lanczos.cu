@@ -26,7 +26,7 @@ void lanczos(double *F, double *Es, double *dev_L, int n_eigs, int n_patch,
              int LANCZOS_ITR)
 {
     // declare and allocate necessary variables
-	cublasHandle_t handle;
+    cublasHandle_t handle;
     double neg_one = -1.0, one = 1.0, zero = 0.0;
 
     double *b;
@@ -39,10 +39,10 @@ void lanczos(double *F, double *Es, double *dev_L, int n_eigs, int n_patch,
     int i;
 
     /* workspace for dstedx */
-	magma_int_t info;
-	magma_int_t lwork, liwork, ldwork;
-	magma_int_t *iwork;
-	double *work, *dwork;
+    magma_int_t info;
+    magma_int_t lwork, liwork, ldwork;
+    magma_int_t *iwork;
+    double *work, *dwork;
     double *eigvec, *dev_eigvec; // eigenvectors
 
     cublasCreate(&handle);
@@ -124,8 +124,8 @@ void lanczos(double *F, double *Es, double *dev_L, int n_eigs, int n_patch,
                  &beta[1], eigvec, LANCZOS_ITR, work, lwork, iwork,
                  liwork, dwork, &info);
 
-	// Copy specified number of eigenvalues
-	memcpy(Es, &alpha[1], n_eigs * sizeof(double));
+    // Copy specified number of eigenvalues
+    memcpy(Es, &alpha[1], n_eigs * sizeof(double));
 
     // extract eigenvectors of L from Q 
     // V = Q(:, 1:k) * U
@@ -135,8 +135,8 @@ void lanczos(double *F, double *Es, double *dev_L, int n_eigs, int n_patch,
                 n_patch, LANCZOS_ITR, LANCZOS_ITR, &one, &q[n_patch],
                 n_patch, dev_eigvec, LANCZOS_ITR, &zero, dev_L,
                 n_patch) );
-	// Copy the corresponding eigenvectors
-	HANDLE_ERROR(cudaMemcpy(F, dev_L, n_patch * n_eigs * sizeof(double),
+    // Copy the corresponding eigenvectors
+    HANDLE_ERROR(cudaMemcpy(F, dev_L, n_patch * n_eigs * sizeof(double),
                  cudaMemcpyDeviceToHost) );
 
     // clean up

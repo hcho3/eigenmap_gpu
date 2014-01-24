@@ -60,12 +60,12 @@ static const char *cublasGetErrorString(cublasStatus_t error)
 
 void HandleCublasError( int int_err, const char *file, int line )
 {
-	cublasStatus_t err = (cublasStatus_t)int_err;
-	if (err != CUBLAS_STATUS_SUCCESS) {
+    cublasStatus_t err = (cublasStatus_t)int_err;
+    if (err != CUBLAS_STATUS_SUCCESS) {
         printf( "%s in %s at line %d\n", cublasGetErrorString( err ),
                 file, line );
         exit( EXIT_FAILURE );
-	}
+    }
 }
 
 template< typename T >

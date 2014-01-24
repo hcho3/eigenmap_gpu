@@ -31,7 +31,7 @@ void lanczos(double *F, double *Es, double *L, int n_eigs, int n_patch,
     double *q;
     int i;
     
-	double *eigvec; // eigenvectors 
+    double *eigvec; // eigenvectors 
 
     // generate random b with norm 1.
     srand((unsigned int)time(NULL));

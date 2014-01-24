@@ -18,7 +18,6 @@ Test_Data/*
 results/
 screenlog.*
 midreport_04082013/
-test.m
 notify.py
 .project
 .cproject

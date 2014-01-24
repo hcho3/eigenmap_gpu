@@ -19,10 +19,10 @@ static void diag_similarity_transform(double *w, int n_patch);
  */
 void laplacian(double *w, int n_patch)
 {
-	/* ---- corresponding Matlab code ----
-	 * D = diag(sum(W));
-	 * L = eye(n_patch) - D^(-1/2)*W*D^(-1/2);
-	 */
+    /* ---- corresponding Matlab code ----
+     * D = diag(sum(W));
+     * L = eye(n_patch) - D^(-1/2)*W*D^(-1/2);
+     */
 
     // W <- D^(-1/2) * W * D^(-1/2)
     diag_similarity_transform(w, n_patch);

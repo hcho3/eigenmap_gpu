@@ -31,25 +31,25 @@ magma_dsyevdx(char jobz, char range, char uplo,
 
 void eigs(double *F, double *Es, double *dev_l, int n_eigs, int n_patch)
 {
-	magma_int_t info;
-	magma_int_t nb, lwork, liwork;
-	magma_int_t *iwork;
-	double *work, *wa;
-	double *lambda; /* eigenvalues */ 
+    magma_int_t info;
+    magma_int_t nb, lwork, liwork;
+    magma_int_t *iwork;
+    double *work, *wa;
+    double *lambda; /* eigenvalues */ 
     double *l;
 
-	/* initialize constants */
-	nb = magma_get_dsytrd_nb(n_patch);
-	lwork = n_patch * nb + 6 * n_patch + 2 * n_patch * n_patch;
-	liwork = 3 + 5 * n_patch;
-	
-	/* initialize workspaces */
-	lambda = (double *)malloc(n_patch*sizeof(double));
-	wa = (double *)malloc(n_patch * n_patch * sizeof(double));
-	iwork = (magma_int_t *)malloc(liwork * sizeof(magma_int_t));
-	work = (double *)malloc(lwork * sizeof(double));
+    /* initialize constants */
+    nb = magma_get_dsytrd_nb(n_patch);
+    lwork = n_patch * nb + 6 * n_patch + 2 * n_patch * n_patch;
+    liwork = 3 + 5 * n_patch;
+    
+    /* initialize workspaces */
+    lambda = (double *)malloc(n_patch*sizeof(double));
+    wa = (double *)malloc(n_patch * n_patch * sizeof(double));
+    iwork = (magma_int_t *)malloc(liwork * sizeof(magma_int_t));
+    work = (double *)malloc(lwork * sizeof(double));
 
-	/* Compute eigenvalues and eigenvectors */
+    /* Compute eigenvalues and eigenvectors */
     //ret = magma_dsyevd_gpu('V', 'L', n_patch, dev_l, n_patch, lambda, wa,
     //                       ldwa, work, lwork, iwork, liwork, &info);
     //printf("ret = %d, info = %d\n", ret, info);
@@ -62,16 +62,16 @@ void eigs(double *F, double *Es, double *dev_l, int n_eigs, int n_patch)
     assert(MAGMA_SUCCESS == magma_dsyevdx('V', 'I', 'L', n_patch, l, n_patch,
            0, 0, 1, n_eigs, &m, lambda, work, lwork, iwork, liwork, &info));
 
-	/* Copy specified number of eigenvalues */
-	memcpy(Es, lambda, n_eigs * sizeof(double));
-	/* Copy the corresponding eigenvectors */
-	//HANDLE_ERROR(cudaMemcpy(F, dev_l, n_eigs * n_patch * sizeof(double),
+    /* Copy specified number of eigenvalues */
+    memcpy(Es, lambda, n_eigs * sizeof(double));
+    /* Copy the corresponding eigenvectors */
+    //HANDLE_ERROR(cudaMemcpy(F, dev_l, n_eigs * n_patch * sizeof(double),
     //             cudaMemcpyDeviceToHost) );
     memcpy(F, l, n_eigs * n_patch * sizeof(double));
 
     free(l);
-	free(iwork);
-	free(work);
-	free(wa);
-	free(lambda);
+    free(iwork);
+    free(work);
+    free(wa);
+    free(lambda);
 }
