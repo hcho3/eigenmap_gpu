@@ -9,7 +9,7 @@ SYNOPSIS
     segmentation process.
 
 DOCUMENTATION
-    See http://www.hyunsu-cho.org/eigenmap_gpu.html.
+    See https://hyunsu-cho.io/eigenmap_gpu.html.
 
 DEPENDENCIES
     1. MAT file I/O Library              --> See Step 1 of HOW TO COMPILE
