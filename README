@@ -1,5 +1,10 @@
 GPU accelerated vessel segmentation using Laplacian eigenmaps
 
+NOTE
+    The codebase has not been maintained since June 2014. Use it with your own
+    risk. **Note that it does not work with MAGMA version 1.5.0 or later. Please
+    use MAGMA version 1.4.1**.
+
 SYNOPSIS
     Laplacian eigenmap is an image segmentation algorithm that began to gain
     traction in recent years. It involves a generalized eigenvalue problem
@@ -17,6 +22,7 @@ DEPENDENCIES
 
     2. MAGMA (Matrix Algebra on GPU and Multicore Architectures)
        http://icl.cs.utk.edu/magma/index.html
+       **Make sure to use MAGMA version 1.4.1**.
 
     3. ATLAS (Automatically Tuned Linear Algebra Software)
        http://math-atlas.sourceforge.net/
